@@ -57,3 +57,25 @@ Bản này đăng văn bản và link. Chưa đính kèm ảnh sản phẩm, đ�
 `npm run typecheck`, `node --test tests/*.test.mjs`, `npm run build`.
 Các test kiểm tra link/độ dài, RLS, chặn sửa trạng thái từ browser, khóa lượt AI và claim đăng bài chỉ một lần, cùng bộ test upload cũ.
 Chưa thử tạo bài bằng khóa thật, chưa gửi bài thật đến Meta, chưa kiểm thử giao diện bằng browser trong môi trường bàn giao. Cần kiểm tra bằng tài khoản của bạn sau cấu hình. Không có quyền truy cập Vercel/Supabase/Meta của bạn để tự điền các khóa.
+
+## Trang công khai cho Meta — bản 1.1.1
+Các route riêng, không yêu cầu đăng nhập ứng dụng:
+- `/privacy-policy/`: chính sách quyền riêng tư.
+- `/terms-of-service/`: điều khoản dịch vụ.
+- `/data-deletion/`: hướng dẫn yêu cầu xóa dữ liệu qua email, KHÔNG phải endpoint callback.
+- `/contact/`: liên hệ quản trị viên.
+
+Email liên hệ lấy từ ảnh cấu hình Meta: roniejisa@gmail.com. Cấu hình nằm trong lib/site-info.ts. Chủ ứng dụng cần kiểm tra email này hoạt động và thực hiện các yêu cầu dữ liệu được gửi đến. Bản này không có hệ thống gửi email/ticket tự động.
+
+Sau redeploy, mở Thiết lập > Đường dẫn cho Meta tại tên miền Production để sao chép URL đầy đủ. Đừng dùng URL Preview hoặc tên miền được bảo vệ bằng đăng nhập Vercel. Kiểm tra từng trang bằng cửa sổ ẩn danh; trang phải tải được công khai và không trả lỗi 404.
+
+Trong Meta Basic Settings:
+- App Domains: hostname Production, không có https:// hoặc phần đường dẫn.
+- Privacy Policy URL: URL đầy đủ kết thúc bằng /privacy-policy/.
+- Terms of Service URL: URL đầy đủ kết thúc bằng /terms-of-service/.
+- User Data Deletion: chọn Data Deletion Instructions URL rồi dùng URL kết thúc bằng /data-deletion/.
+
+Các trang được tạo theo tính năng hiện tại, không phải chứng nhận pháp lý hoặc bảo đảm Meta xét duyệt. Biểu tượng ứng dụng và hạng mục còn thiếu trong ảnh là hai mục cấu hình riêng, không phải trang web.
+
+### Quy trình quản trị khi nhận yêu cầu xóa
+Xác minh quyền sở hữu trước khi xử lý. Xác nhận phạm vi và thời gian dự kiến với người gửi. Nếu xóa toàn bộ, kiểm tra các object Storage của user trước khi xóa tài khoản, dọn ảnh và dữ liệu liên quan (sản phẩm/ảnh, nội dung, lượt AI), sau đó xóa tài khoản Auth nếu nằm trong phạm vi yêu cầu. Không chỉ xóa sản phẩm vì lịch sử nội dung có thể vẫn tồn tại. Kiểm tra lỗi và phần dữ liệu còn lại; gỡ token server tương ứng và thu hồi quyền Meta nếu cần. Thông báo kết quả và các giới hạn lưu giữ thực tế, không hứa xóa bản sao lưu chưa kiểm chứng. Bài đã đăng cần được xử lý riêng trên Meta. Không thực hiện xóa chỉ vì người gửi biết email/ID của tài khoản.

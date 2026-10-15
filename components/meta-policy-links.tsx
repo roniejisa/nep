@@ -1,0 +1,4 @@
+'use client';
+import {useEffect,useState} from 'react';
+const pages=[['URL chính sách quyền riêng tư','/privacy-policy/'],['URL điều khoản dịch vụ','/terms-of-service/'],['URL hướng dẫn xóa dữ liệu','/data-deletion/'],['Liên hệ','/contact/']];
+export default function MetaPolicyLinks(){const [origin,setOrigin]=useState('');useEffect(()=>{setOrigin(window.location.origin);},[]);return <section className="setup-card"><h2>Đường dẫn cho Meta</h2><p className="setup-copy">Dùng tên miền Production công khai. Trong Meta, chọn “URL hướng dẫn xóa dữ liệu”, không chọn callback. Mở từng link bằng cửa sổ ẩn danh trước khi gửi xét duyệt.</p><div className="meta-links">{pages.map(([label,path])=><label key={path}>{label}<div className="meta-link-row"><input aria-label={label} readOnly value={origin?origin+path:path} onFocus={e=>e.currentTarget.select()}/><a href={path} target="_blank" rel="noreferrer">Mở trang ↗</a></div></label>)}</div></section>}

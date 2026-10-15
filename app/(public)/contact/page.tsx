@@ -1,0 +1,5 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { CONTACT_EMAIL } from '@/lib/site-info';
+export const metadata:Metadata={title:'Liên hệ | Nếp',description:'Liên hệ quản trị viên Nếp về hỗ trợ, quyền riêng tư và yêu cầu xóa dữ liệu.'};
+export default function Contact(){return <><p className="public-kicker">Nếp · Contact</p><h1>Liên hệ Nếp</h1><p>Nếp là công cụ hỗ trợ quản trị sản phẩm và nội dung affiliate. Quản trị viên Nếp tiếp nhận các câu hỏi về sử dụng ứng dụng, dữ liệu và quyền truy cập qua email.</p><div className="public-callout"><p><strong>Email hỗ trợ:</strong><br/><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p></div><h2>Thông tin giúp xử lý yêu cầu</h2><p>Hãy mô tả vấn đề, thời điểm xảy ra và email tài khoản liên quan. Nếu gửi ảnh lỗi, che token, khóa API và thông tin riêng tư không cần thiết. Trang này mở ứng dụng email của bạn; không tự gửi yêu cầu khi bạn bấm vào địa chỉ.</p><h2>Yêu cầu về dữ liệu</h2><p>Xem <Link href="/data-deletion/">hướng dẫn xóa dữ liệu</Link> để gửi yêu cầu đầy đủ. Cách ứng dụng xử lý dữ liệu được mô tả tại <Link href="/privacy-policy/">Chính sách quyền riêng tư</Link>.</p></>}
