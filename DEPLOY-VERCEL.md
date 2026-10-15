@@ -379,3 +379,8 @@ Tính năng mới gửi ảnh tham chiếu sản phẩm đến Google; hãy cậ
 Tài liệu model ảnh: https://ai.google.dev/gemini-api/docs/generate-content/image-generation
 Danh sách model: https://ai.google.dev/gemini-api/docs/models
 Giá và hạn mức: https://ai.google.dev/gemini-api/docs/pricing
+
+
+## Tự động đăng mỗi giờ (2.4)
+
+Xem `HUONG-DAN-TU-DONG.md`. Chạy `automation.sql`, đặt CRON_SECRET/Vault, chạy `automation-schedule.sql`, rồi bật và lưu tại `/automation/`. Không tự bật trước khi bạn cấu hình.

@@ -1,0 +1,12 @@
+import {authorize,failure,readBody} from '@/lib/content-server';
+import {automationSettings} from '@/lib/automation-rules';
+import {automationTarget} from '@/lib/automation';
+import {configuredProviders} from '@/lib/ai-provider';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+export async function GET(request:Request){try{const {db,user}=await authorize(request);const {data:settings,error}=await db.from('affiliate_automation_settings').select('*').eq('owner_id',user.id).maybeSingle();const {data:jobs,error:jobError}=await db.from('affiliate_automation_jobs').select('*').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(30);if(error||jobError)throw new Error('Chạy automation.sql trong Supabase để khởi tạo lịch.');return Response.json({settings,jobs,cronConfigured:(process.env.CRON_SECRET?.trim().length||0)>=32},{headers:{'Cache-Control':'no-store'}});}catch(e){return failure(e);}}
+export async function POST(request:Request){try{const {db,user}=await authorize(request);const input=await readBody(request);
+ if(input.action==='pause'){const {error}=await db.from('affiliate_automation_settings').update({enabled:false,updated_at:new Date().toISOString()}).eq('owner_id',user.id);if(error)throw new Error('Không tắt được lịch.');return Response.json({paused:true});}
+ const cfg=automationSettings(input),targets:Record<string,string>={};
+ if(cfg.enabled){if(input.autoPublishConsent!==true)throw new Error('Xác nhận cho phép lịch tự đăng bài.');if((process.env.CRON_SECRET?.trim().length||0)<32)throw new Error('Thêm CRON_SECRET ít nhất 32 ký tự trên Vercel.');if(!configuredProviders()[cfg.provider as keyof ReturnType<typeof configuredProviders>])throw new Error('Thiếu khóa AI đã chọn.');for(const channel of cfg.channels){const target=await automationTarget(db,user.id,channel);targets[channel]=target.id;}}
+ const {error}=await db.from('affiliate_automation_settings').upsert({...cfg,targets,owner_id:user.id,updated_at:new Date().toISOString()});if(error)throw new Error('Không lưu được lịch. Chạy automation.sql.');return Response.json({saved:true});
+ }catch(e){return failure(e);}}
