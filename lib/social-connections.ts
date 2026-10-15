@@ -1,3 +1,4 @@
+import {OperationError} from './operation-error';
 import {createHmac} from 'node:crypto';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {env} from './content-server';
@@ -20,7 +21,7 @@ export async function socialConnectionStatus(db:SupabaseClient,ownerId:string,pr
 export async function socialTarget(db:SupabaseClient,ownerId:string,provider:OAuthProvider){
  const {data}=await db.from('affiliate_social_connections').select('actor_id,token_encrypted,active,expires_at').eq('owner_id',ownerId).eq('provider',provider).maybeSingle();
  let id:string,token:string,proof:string|undefined;
- if(data){if(!data.active)throw new Error(`Đã ngắt kết nối ${SOCIAL_PROVIDER_NAMES[provider]}. Kết nối lại trước khi đăng.`);if(data.expires_at&&new Date(data.expires_at).getTime()<=Date.now())throw new Error(`Token ${SOCIAL_PROVIDER_NAMES[provider]} hết hạn. Kết nối lại hoặc gia hạn trong Thiết lập.`);id=data.actor_id;try{token=decryptToken(data.token_encrypted,socialEncryptionKey(provider));}catch{throw new Error('Không giải mã được token. Kết nối lại sau khi đổi App Secret/khóa mã hóa.');}if(provider==='facebook')proof=appSecretProof(token,socialAppSecret(provider));}
+ if(data){if(!data.active)throw new Error(`Đã ngắt kết nối ${SOCIAL_PROVIDER_NAMES[provider]}. Kết nối lại trước khi đăng.`);if(data.expires_at&&new Date(data.expires_at).getTime()<=Date.now())throw new OperationError(`Token ${SOCIAL_PROVIDER_NAMES[provider]} hết hạn. Kết nối lại hoặc gia hạn trong Thiết lập.`,'token');id=data.actor_id;try{token=decryptToken(data.token_encrypted,socialEncryptionKey(provider));}catch{throw new OperationError('Không giải mã được token. Kết nối lại sau khi đổi App Secret/khóa mã hóa.','token');}if(provider==='facebook')proof=appSecretProof(token,socialAppSecret(provider));}
  else{id=env(provider==='facebook'?'FACEBOOK_PAGE_ID':'THREADS_USER_ID');token=env(provider==='facebook'?'FACEBOOK_PAGE_ACCESS_TOKEN':'THREADS_ACCESS_TOKEN');}
  return {id,token,version:socialVersion(provider),appSecretProof:proof};
 }

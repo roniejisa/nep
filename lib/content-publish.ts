@@ -28,11 +28,14 @@ const {postId,body,approved,action,imageId,expectedTargetId}=input;
   if(!/^\d+$/.test(target.id)||!/^v\d+\.\d+$/.test(target.version))throw new Error('ID tài khoản hoặc phiên bản API không hợp lệ.');
   let imageUrl:string|undefined;
   if(selectedImage){const base=new URL(env('PUBLIC_SITE_URL'));if(base.protocol!=='https:')throw new Error('PUBLIC_SITE_URL phải dùng HTTPS.');imageUrl=new URL(`/api/social-image/${signImage(selectedImage,process.env.SOCIAL_IMAGE_SIGNING_SECRET||env('SUPABASE_SERVICE_ROLE_KEY'))}/`,base.origin).href;}
+  const {data:reserved,error:reserveError}=await db.rpc('reserve_affiliate_product_post',{p_owner:ownerId,p_post:post.id});
+  if(reserveError)throw new Error('Không kiểm tra được giới hạn sản phẩm. Chạy automation-controls.sql trước khi đăng.');
+  if(!reserved)throw new Error('Sản phẩm đã dùng lượt buổi này hoặc ngoài giờ sáng/tối cho phép. Tối đa một lần sáng và một lần tối, tính chung mọi kênh.');
   const {data:claim,error:claimError}=await db.from('affiliate_content_posts').update({body,image_id:selectedImage||null,status:'publishing',target_id:target.id}).eq('id',post.id).eq('owner_id',ownerId).eq('status','draft').select().maybeSingle();
   if(claimError||!claim)throw new Error('Bài đang được gửi ở nơi khác. Hãy làm mới lịch sử.');
   try{
    const result=await publishSocial({channel:post.channel,body,imageUrl,target,onContainer:async id=>{const {error}=await db.from('affiliate_content_posts').update({container_id:id}).eq('id',post.id).eq('owner_id',ownerId);if(error)throw new Error('Không lưu được container, dừng trước khi publish.');}});
    const {data:saved,error:saveError}=await db.from('affiliate_content_posts').update({status:'published',external_id:result.id,published_at:new Date().toISOString()}).eq('id',post.id).select().single();if(saveError)throw new Error('Meta đã nhận bài nhưng chưa lưu được lịch sử. Kiểm tra tài khoản đích.');
    return {post:saved};
-  }catch(error){await db.from('affiliate_content_posts').update({status:'unknown'}).eq('id',post.id).eq('status','publishing');throw new Error(`${error instanceof Error?error.message:'Lỗi kết nối Meta.'} Cần xác minh trên Meta; không tự gửi lại.`);}
+  }catch(error){await db.from('affiliate_content_posts').update({status:'unknown'}).eq('id',post.id).eq('status','publishing');throw new Error(`${error instanceof Error?error.message:'Lỗi kết nối Meta.'} Cần xác minh trên Meta; không tự gửi lại.`,{cause:error});}
 }

@@ -1,9 +1,10 @@
+import {OperationError} from './operation-error.ts';
 import type {Channel} from './content-rules';
 export type SocialTarget={id:string;token:string;version:string;instagramLogin?:'facebook'|'instagram';appSecretProof?:string};
 export async function metaRequest(url:string,token:string,values?:Record<string,string>,transport:typeof fetch=fetch){
- const response=await transport(url,{method:values?'POST':'GET',headers:{Authorization:`Bearer ${token}`},body:values?new URLSearchParams(values):undefined,signal:AbortSignal.timeout(15000),redirect:'error',cache:'no-store'});
- let data;try{data=await response.json();}catch{throw new Error(`Meta trả phản hồi không hợp lệ (HTTP ${response.status}).`);}
- if(!response.ok||data.error)throw new Error(`Meta từ chối (HTTP ${response.status}, mã ${data.error?.code??'không có'}, mã phụ ${data.error?.error_subcode??'không có'}). Kiểm tra quyền, token và tài khoản đích.`);
+ let response:Response;try{response=await transport(url,{method:values?'POST':'GET',headers:{Authorization:`Bearer ${token}`},body:values?new URLSearchParams(values):undefined,signal:AbortSignal.timeout(15000),redirect:'error',cache:'no-store'});}catch{throw new OperationError('Không kết nối được Meta hoặc hết thời gian chờ.','network');}
+ let data;try{data=await response.json();}catch{throw new OperationError(`Meta trả phản hồi không hợp lệ (HTTP ${response.status}).`,'meta',response.status);}
+ if(!response.ok||data.error){const code=Number.isInteger(data.error?.code)?data.error.code:null,subcode=Number.isInteger(data.error?.error_subcode)?data.error.error_subcode:null;const kind=code===190||code===102?'token':code===10||code===200||response.status===403?'permission':response.status===429||[4,17,32,613].includes(code)?'rate_limit':'meta';throw new OperationError(`Meta từ chối (HTTP ${response.status}, mã ${code??'không có'}, mã phụ ${subcode??'không có'}). ${kind==='token'?'Token hết hạn, bị thu hồi hoặc không hợp lệ.':'Kiểm tra quyền, dữ liệu và tài khoản đích.'}`,kind,response.status,code,subcode);}
  return data;
 }
 export async function publishSocial(options:{channel:Channel;body:string;imageUrl?:string;target:SocialTarget;onContainer:(id:string)=>Promise<void>;transport?:typeof fetch;pause?:(ms:number)=>Promise<void>}){

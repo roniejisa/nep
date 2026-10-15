@@ -1,3 +1,4 @@
+import {OperationError} from './operation-error';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {env} from './content-server';
 import {decryptToken} from './instagram-oauth-crypto';
@@ -14,7 +15,7 @@ export async function instagramConnectionStatus(db:SupabaseClient,ownerId:string
 }
 export async function instagramTarget(db:SupabaseClient,ownerId:string){
  const {data,error}=await db.from('affiliate_instagram_connections').select('instagram_user_id,access_token_encrypted,expires_at').eq('owner_id',ownerId).maybeSingle();
- if(data){if(new Date(data.expires_at).getTime()<=Date.now())throw new Error('Kết nối Instagram hết hạn. Vào Thiết lập và kết nối lại.');let token;try{token=decryptToken(data.access_token_encrypted,instagramEncryptionKey());}catch{throw new Error('Không giải mã được token Instagram. Kết nối lại sau khi đổi App Secret/khóa mã hóa.');}return {id:data.instagram_user_id,token,version:instagramVersion(),instagramLogin:'instagram' as const};}
+ if(data){if(new Date(data.expires_at).getTime()<=Date.now())throw new OperationError('Kết nối Instagram hết hạn. Vào Thiết lập và kết nối lại.','token');let token;try{token=decryptToken(data.access_token_encrypted,instagramEncryptionKey());}catch{throw new OperationError('Không giải mã được token Instagram. Kết nối lại sau khi đổi App Secret/khóa mã hóa.','token');}return {id:data.instagram_user_id,token,version:instagramVersion(),instagramLogin:'instagram' as const};}
  if(directInstagramConfigured())throw new Error(error?'Chạy instagram-oauth.sql trước khi kết nối Instagram.':'Chưa kết nối Instagram. Vào Thiết lập → Kết nối Instagram.');
  return {id:env('INSTAGRAM_USER_ID'),token:process.env.INSTAGRAM_ACCESS_TOKEN?.trim()||env('FACEBOOK_PAGE_ACCESS_TOKEN'),version:env('META_GRAPH_VERSION'),instagramLogin:'facebook' as const};
 }

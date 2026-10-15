@@ -1,4 +1,4 @@
--- Run automation.sql first. Create Vault secret nep_cron_secret via Dashboard;
+-- Run automation.sql AND automation-controls.sql first. Create Vault secret nep_cron_secret via Dashboard;
 -- value must equal CRON_SECRET on Vercel (at least 32 random characters).
 -- No credentials should be inserted into this source file.
 create extension if not exists pg_cron;
@@ -19,3 +19,10 @@ select cron.schedule('nep-hourly-publish','0 * * * *',$job$
 $job$);
 -- To remove the scheduler later: select cron.unschedule('nep-hourly-publish');
 -- To pause publishing: use the off button at /automation/ (no SQL needed).
+
+-- Runs independently of publishing's on/off state. Expired errors disappear from UI
+-- at exactly 8h; physical deletion occurs on the next minute while Cron is active.
+select cron.schedule('nep-cleanup-errors','* * * * *',$cleanup$
+ select public.cleanup_affiliate_automation();
+ delete from cron.job_run_details where jobid in(select jobid from cron.job where jobname in('nep-hourly-publish','nep-cleanup-errors')) and end_time<now()-interval '8 hours';
+$cleanup$);
