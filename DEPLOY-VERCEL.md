@@ -389,3 +389,7 @@ Xem `HUONG-DAN-TU-DONG.md`. Chạy `automation.sql`, đặt CRON_SECRET/Vault, c
 ## Nâng cấp 2.6
 
 Từ 2.5: chạy `supabase/automation-flex.sql`, chạy lại `supabase/automation-schedule.sql`, cập nhật source và redeploy. Cấu hình tại `/automation/`, quản lý danh mục tại `/categories/`. Xem `HUONG-DAN-TU-DONG.md`.
+
+## Nâng cấp 2.7
+
+Từ 2.6: chạy `supabase/automation-times.sql`, chạy lại `supabase/automation-schedule.sql`, cập nhật source và redeploy. Vào `/automation/`, chọn mẫu 6 / 8 / 10 giờ hoặc tự thêm giờ, xác nhận và lưu. Không cần đổi CRON_SECRET/Vault. Xem HUONG-DAN-TU-DONG.md.

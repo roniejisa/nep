@@ -27,7 +27,7 @@ test('flex migration preserves limits, supports minute windows, renames categori
  const db=new PGlite(),owner='11111111-1111-4111-8111-111111111111',other='33333333-3333-4333-8333-333333333333',product='22222222-2222-4222-8222-222222222222';
  try{
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);insert into auth.users values('${owner}'),('${other}');create function auth.uid() returns uuid language sql as $$select null::uuid$$;create table affiliate_products(id uuid primary key,owner_id uuid,category text default 'Khác',status text default 'ready');insert into affiliate_products values('${product}','${owner}','Chăm sóc tóc','ready');create table affiliate_product_images(id uuid primary key);`);
- for(const name of ['content.sql','social-v2.sql','automation.sql','automation-controls.sql','automation-flex.sql'])await db.exec(await readFile(new URL('../supabase/'+name,import.meta.url),'utf8'));
+ for(const name of ['content.sql','social-v2.sql','automation.sql','automation-controls.sql','automation-flex.sql','automation-times.sql'])await db.exec(await readFile(new URL('../supabase/'+name,import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/automation-flex.sql',import.meta.url),'utf8'));
  await db.exec(`insert into affiliate_automation_settings(owner_id,enabled,selection_mode,selected_categories,morning_start) values('${owner}',true,'categories','["Chăm sóc tóc"]',7.5)`);
  assert.equal((await db.query(`select affiliate_posting_period('2026-10-16T07:29:00+07',7.5::numeric,12::numeric,18::numeric,23::numeric) p`)).rows[0].p,null);

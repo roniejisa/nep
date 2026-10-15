@@ -1,4 +1,4 @@
--- Run automation.sql, automation-controls.sql AND automation-flex.sql first. Create Vault secret nep_cron_secret via Dashboard;
+-- Run automation.sql, automation-controls.sql automation-flex.sql AND automation-times.sql first. Create Vault secret nep_cron_secret via Dashboard;
 -- value must equal CRON_SECRET on Vercel (at least 32 random characters).
 -- No credentials should be inserted into this source file.
 create extension if not exists pg_cron;
@@ -17,8 +17,9 @@ select cron.schedule('nep-hourly-publish','* * * * *',$job$
   timeout_milliseconds := 130000
  ) where exists (
  select 1 from public.affiliate_automation_settings s
- cross join lateral (select public.affiliate_posting_period(now(),s.morning_start,s.morning_end,s.evening_start,s.evening_end) period) w
- where s.enabled and w.period is not null and mod((extract(hour from now() at time zone 'Asia/Ho_Chi_Minh')*60+extract(minute from now() at time zone 'Asia/Ho_Chi_Minh'))::integer-round((case when w.period='morning' then s.morning_start else s.evening_start end)*60)::integer,60)=0
+ cross join lateral (select public.due_affiliate_slot(s.owner_id) due) d
+ where s.enabled and d.due is not null
+ and not exists(select 1 from public.affiliate_automation_jobs j where j.owner_id=s.owner_id and j.slot=d.due)
  );
 $job$);
 -- To remove the scheduler later: select cron.unschedule('nep-hourly-publish');

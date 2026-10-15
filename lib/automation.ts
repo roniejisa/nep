@@ -4,7 +4,7 @@ import {generateContent} from './content-generate';
 import {publishContent} from './content-publish';
 import {socialTarget} from './social-connections';
 import {instagramTarget} from './instagram-connection';
-import {automationSettings,pickRandom,postingWindow,productMatches,imageChoices} from './automation-rules';
+import {automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue} from './automation-rules';
 import {configuredProviders} from './ai-provider';
 import {metaRequest,type SocialTarget} from './social-publish';
 import {explainError} from './operation-error';
@@ -15,10 +15,10 @@ export async function runAutomation(){
  const started=Date.now(),db=database(),owner=env('CONTENT_ADMIN_USER_ID');
  const {error:cleanupError}=await db.rpc('cleanup_affiliate_automation');if(cleanupError)throw new Error('Chạy automation-controls.sql để bật kiểm soát và dọn lỗi.');
  const {data:schedule,error:scheduleError}=await db.from('affiliate_automation_settings').select('*').eq('owner_id',owner).maybeSingle();if(scheduleError)throw new Error('Không đọc được cấu hình lịch.');
- if(!schedule?.enabled||!postingWindow(schedule).period)return {status:'skipped',message:'Lịch tắt hoặc ngoài khung giờ sáng/tối.'};
+ if(!schedule?.enabled||!scheduledDue(schedule))return {status:'skipped',message:'Lịch tắt hoặc chưa đến giờ đã chọn.'};
  const {data:job,error:claimError}=await db.rpc('claim_affiliate_automation',{p_owner:owner});
  if(claimError)throw new Error('Chưa lấy được lượt chạy. Chạy automation.sql trước.');
- if(!job)return {status:'skipped',message:'Lịch tắt, đã chạy giờ này, đang chạy hoặc đã đạt hạn mức.'};
+ if(!job)return {status:'skipped',message:'Lịch tắt, lượt đã chạy, đang chạy hoặc đã đạt hạn mức.'};
  let stage='database',channel:Channel|null=null;
  const finish=async(status:string,message:string)=>{const {error}=await db.from('affiliate_automation_jobs').update({status,message,finished_at:new Date().toISOString()}).eq('id',job);if(error)throw new Error('Không lưu được lịch sử tự động.');return {status,message};};
  try{

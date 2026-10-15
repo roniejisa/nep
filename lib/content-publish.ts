@@ -32,7 +32,7 @@ const {postId,body,approved,action,imageId,expectedTargetId}=input;
   if(selectedImages.length){const base=new URL(env('PUBLIC_SITE_URL'));if(base.protocol!=='https:')throw new Error('PUBLIC_SITE_URL phải dùng HTTPS.');for(const id of selectedImages)imageUrls.push(new URL(`/api/social-image/${signImage(id,process.env.SOCIAL_IMAGE_SIGNING_SECRET||env('SUPABASE_SERVICE_ROLE_KEY'))}/`,base.origin).href);}
   const {data:reserved,error:reserveError}=await db.rpc('reserve_affiliate_product_post',{p_owner:ownerId,p_post:post.id});
   if(reserveError)throw new Error('Không kiểm tra được giới hạn sản phẩm. Chạy automation-controls.sql trước khi đăng.');
-  if(!reserved)throw new Error('Sản phẩm đã dùng lượt buổi này hoặc ngoài giờ sáng/tối cho phép. Tối đa một lần sáng và một lần tối, tính chung mọi kênh.');
+  if(!reserved)throw new Error('Sản phẩm không còn lượt đăng hợp lệ ở thời điểm này. Tối đa một lần trước 12:00 và một lần từ 12:00, tính chung mọi kênh.');
   const {data:claim,error:claimError}=await db.from('affiliate_content_posts').update({body,image_id:selectedImage,image_ids:selectedImages,status:'publishing',target_id:target.id}).eq('id',post.id).eq('owner_id',ownerId).eq('status','draft').select().maybeSingle();
   if(claimError||!claim)throw new Error('Bài đang được gửi ở nơi khác. Hãy làm mới lịch sử.');
   try{

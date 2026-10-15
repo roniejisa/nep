@@ -8,7 +8,9 @@ export function automationSettings(value:Record<string,unknown>){
  contentBrief(value.copy_length,'problem');
  if(!Number.isInteger(value.daily_limit)||Number(value.daily_limit)<1||Number(value.daily_limit)>24)throw new Error('Giới hạn từ 1 đến 24 lượt/ngày.');
  const {morning_start,morning_end,evening_start,evening_end}=postingWindow(value);
- return {...selectionSettings(value),morning_start,morning_end,evening_start,evening_end,enabled:value.enabled,channels,provider:String(value.provider),model,copy_length:String(value.copy_length),daily_limit:Number(value.daily_limit)};
+ const schedule_mode=value.schedule_mode==='times'?'times':'windows';if(value.schedule_mode&& !['times','windows'].includes(String(value.schedule_mode)))throw new Error('Chế độ lịch không hợp lệ.');
+ const schedule_times=schedule_mode==='times'?scheduleTimes(value.schedule_times):[];
+ return {schedule_mode,schedule_times,...selectionSettings(value),morning_start,morning_end,evening_start,evening_end,enabled:value.enabled,channels,provider:String(value.provider),model,copy_length:String(value.copy_length),daily_limit:Number(value.daily_limit)};
 }
 export function pickRandom<T>(values:T[],random:()=>number=Math.random):T{if(!values.length)throw new Error('Không có lựa chọn phù hợp.');return values[Math.min(values.length-1,Math.floor(random()*values.length))];}
 
@@ -30,3 +32,25 @@ export function selectionSettings(value:Record<string,unknown>){
 }
 export function productMatches(p:{id:string;category?:string},cfg:ReturnType<typeof selectionSettings>){return cfg.selection_mode==='random'||cfg.selection_mode==='products'&&cfg.selected_products.includes(p.id)||cfg.selection_mode==='categories'&&cfg.selected_categories.includes(p.category||'');}
 export function imageChoices<T>(images:T[],maximum:number,random:()=>number=Math.random):T[]{const remaining=[...images],chosen:T[]=[];while(remaining.length&&chosen.length<maximum){const i=Math.floor(random()*remaining.length);chosen.push(remaining.splice(i,1)[0]);}return chosen;}
+
+export const schedulePresets:Record<string,string[]>={
+ '6':['07:00','10:00','13:00','16:00','19:00','22:00'],
+ '8':['07:00','09:00','11:00','14:00','17:00','19:00','21:00','23:00'],
+ '10':['06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','21:30','23:00']
+};
+export function scheduleTimes(input:unknown):string[]{
+ if(!Array.isArray(input)||input.length<1||input.length>24||input.some(t=>typeof t!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t))||new Set(input).size!==input.length)throw new Error('Chọn 1–24 giờ hợp lệ, không trùng nhau.');
+ const sorted=[...input].sort() as string[],minutes=sorted.map(t=>Number(t.slice(0,2))*60+Number(t.slice(3)));
+ if(minutes.some((v,i)=>i>0&&v-minutes[i-1]<15)||minutes.length>1&&1440-minutes.at(-1)!+minutes[0]<15)throw new Error('Hai giờ đăng cần cách nhau ít nhất 15 phút, kể cả qua nửa đêm.');
+ return sorted;
+}
+export function legacyTimes(value:Record<string,unknown>):string[]{
+ const w=postingWindow(value),times:string[]=[];
+ for(const [start,end] of [[w.morning_start,w.morning_end],[w.evening_start,w.evening_end]])for(let m=Math.round(start*60);m<Math.round(end*60);m+=60)times.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
+ return times;
+}
+export function scheduledDue(value:Record<string,unknown>,now=new Date()){
+ if(value.schedule_mode!=='times')return postingWindow(value,now).period!==null;
+ const local=new Date(now.getTime()+7*3600000),minute=local.getUTCHours()*60+local.getUTCMinutes();
+ return scheduleTimes(value.schedule_times).some(t=>{const m=Number(t.slice(0,2))*60+Number(t.slice(3));return minute>=m&&minute<m+5;});
+}

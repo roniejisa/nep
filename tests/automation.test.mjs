@@ -7,7 +7,7 @@ const source=await readFile(new URL('../lib/automation-rules.ts',import.meta.url
 // Compile this pure module with its only dependency inlined for Node's native test runner.
 const rules=await readFile(new URL('../lib/content-rules.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(rules+'\n'+source.replace(/^import[^\n]+\n/,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {automationSettings,pickRandom,postingWindow,productMatches,imageChoices}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const {automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,scheduleTimes,schedulePresets}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 test('automation rejects invalid channels, models, budgets and explicit state; random choice stays in pool',()=>{
  const cfg={enabled:true,channels:['threads'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24};
  assert.equal(automationSettings(cfg).daily_limit,24);
@@ -44,11 +44,11 @@ async function workerFixture({target='123',afterGeneration=false,interrupted=fal
  }else{logs.push({table,payload});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
  return Promise.resolve({data,error:null}).then(resolve);
  };return (...args)=>{if(['select','update'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
- const deps={database:()=>db,env:()=> 'owner1',generateContent:async()=>{generated++;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
+ const deps={database:()=>db,env:()=> 'owner1',generateContent:async()=>{generated++;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
  globalThis.__automationDeps=deps;
  let src=await readFile(new URL('../lib/automation.ts',import.meta.url),'utf8');
  src=src.replace(/^import (?!.*node:crypto).*\n/gm,'');
- src="const {database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,metaRequest,explainError,configuredProviders}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
+ src="const {database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
  const code=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const worker=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
  return {worker,stats:()=>({generated,published,paused,logs})};
@@ -116,4 +116,14 @@ test('no image automatically removes Instagram from the random candidate pool',a
  assert.equal(picked.payload.channel,'facebook');
  const igOnly=await workerFixture({cfgOverride:{channels:['instagram'],max_images:0}});assert.equal((await igOnly.worker.runAutomation()).status,'skipped');assert.equal(igOnly.stats().generated,0);assert.equal(igOnly.stats().paused,false);
  const filtered=await workerFixture({cfgOverride:{selection_mode:'categories',selected_categories:['Not this category']}});assert.equal((await filtered.worker.runAutomation()).status,'skipped');assert.equal(filtered.stats().generated,0);
+});
+
+test('explicit schedules support 6/8/10 slots, reject duplicates/close times and only become due within grace',()=>{
+ for(const count of ['6','8','10'])assert.equal(scheduleTimes(schedulePresets[count]).length,Number(count));
+ for(const times of [[],['24:00'],['7:00'],['07:00','07:00'],['07:00','07:10'],['23:55','00:05']])assert.throws(()=>scheduleTimes(times));
+ const cfg={schedule_mode:'times',schedule_times:['07:00','09:00','14:00']};
+ assert.equal(scheduledDue(cfg,new Date('2026-10-16T06:59:00+07:00')),false);
+ assert.equal(scheduledDue(cfg,new Date('2026-10-16T07:04:00+07:00')),true);
+ assert.equal(scheduledDue(cfg,new Date('2026-10-16T07:05:00+07:00')),false);
+ assert.equal(scheduledDue(cfg,new Date('2026-10-16T14:00:00+07:00')),true);
 });
