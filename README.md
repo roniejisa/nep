@@ -1,8 +1,8 @@
 # Nếp — Quản trị Shopee Affiliate
 
-Hướng dẫn triển khai: đọc DEPLOY-VERCEL.md trước.
+**Bản 1.1 cho Vercel: đọc DEPLOY-VERCEL.md để bật Nội dung AI và đăng Meta.**
 
-Ứng dụng Next.js App Router + Supabase, giao diện tiếng Việt, responsive. Dùng Next.js static export; dữ liệu được đọc/ghi trực tiếp qua Supabase SDK và được bảo vệ bằng Auth + RLS.
+Ứng dụng Next.js App Router + Supabase, giao diện tiếng Việt, responsive. Dùng Next.js server trên Vercel; dữ liệu được đọc/ghi trực tiếp qua Supabase SDK và được bảo vệ bằng Auth + RLS.
 
 ## Thiết lập Supabase một lần
 
@@ -36,7 +36,7 @@ Không cần service-role key trong ứng dụng. Không tắt RLS và không ch
 - Sản phẩm được lưu trước ảnh. Nếu ảnh lỗi, giao diện báo lỗi và giữ phần chưa lưu để thử lại. File upload có bản ghi ảnh thất bại sẽ được thử dọn ngay.
 - Đổi ảnh đại diện/xóa ảnh đã lưu có tác dụng ngay; nút Đóng không hoàn tác các thao tác này.
 - Chỉ tải 500 sản phẩm cập nhật gần nhất ở bản đầu; giao diện thông báo nếu tổng số vượt giới hạn. Thống kê ảnh/xuất dữ liệu phản ánh danh sách đang tải.
-- Tự lấy dữ liệu Shopee, sinh nội dung AI và tự đăng mạng xã hội chưa thuộc bản này.
+- Có tạo nội dung AI và gửi bài Facebook Page / Threads sau khi duyệt, khi đã cấu hình server theo DEPLOY-VERCEL.md. Chưa tự lấy dữ liệu Shopee hoặc đăng không cần duyệt.
 
 ## Phát triển
 
@@ -49,7 +49,7 @@ npm run typecheck
 npm run build
 ```
 
-Build xuất vào `out/`. `scripts/build.mjs` chỉ bỏ qua bộ đo RSS tùy chọn của Next.js khi môi trường không cung cấp syscall `uv_resident_set_memory`; kiểm tra kiểu, biên dịch và xuất trang vẫn chạy đầy đủ. Không có thay đổi này ở môi trường hỗ trợ thống kê bộ nhớ.
+Build server xuất vào `.next/`, không dùng thư mục `out/`. `scripts/build.mjs` chỉ bỏ qua bộ đo RSS tùy chọn của Next.js khi môi trường không cung cấp syscall `uv_resident_set_memory`; kiểm tra kiểu, biên dịch và xuất trang vẫn chạy đầy đủ. Không có thay đổi này ở môi trường hỗ trợ thống kê bộ nhớ.
 
 ## Sửa lỗi upload RLS — phiên bản 1.0.2
 
