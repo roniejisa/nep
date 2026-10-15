@@ -1,3 +1,7 @@
+# Nếp 2.3 — OAuth Fanpage, Instagram, Threads
+
+Đọc phần đầu HUONG-DAN-META.md. Chạy thêm social-oauth.sql cho Facebook/Threads; giữ instagram-oauth.sql cho Instagram. Các nút kết nối nằm trong Thiết lập. Facebook có bước chọn Page rõ ràng. Token lưu mã hóa phía server; không cần lấy access token thủ công.
+
 # Nếp 2.2 — Instagram Login trực tiếp
 
 Đọc phần đầu **HUONG-DAN-META.md** để dùng Instagram App ID/Secret với nút Kết nối Instagram tại https://nep-hp.vercel.app. Chạy thêm supabase/instagram-oauth.sql. Token được mã hóa, giữ riêng phía server; không cần lấy token thủ công trong Explorer.

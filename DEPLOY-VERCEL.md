@@ -1,3 +1,114 @@
+# Nếp 2.3 — OAuth Facebook Fanpage, Instagram và Threads
+
+Bạn có thể đăng nhập/cấp quyền từng nền tảng ngay trong Nếp. Không cần lấy access token thủ công trong Graph API Explorer. Facebook có bước chọn Fanpage rõ ràng sau khi cấp quyền, không tự lấy Page đầu tiên. Mọi token OAuth được mã hóa trước khi lưu Supabase, chỉ server đọc được.
+
+## 1. Cập nhật và chạy SQL
+
+1. Đưa source mới lên repository GitHub của nep-hp.vercel.app.
+2. Nếu chưa chạy social-v2.sql (bản Instagram/ảnh trước đó), chạy script này trước.
+3. Nếu chưa chạy instagram-oauth.sql của bản 2.2, chạy script đó để bật OAuth Instagram.
+4. Chạy thêm **supabase/social-oauth.sql** để bật OAuth Facebook và Threads. Các script mới tạo bảng riêng, không xóa sản phẩm hoặc bài đăng cũ.
+5. Giữ SUPABASE_SERVICE_ROLE_KEY và CONTENT_ADMIN_USER_ID hiện tại. Token thủ công Facebook/Threads đang hoạt động vẫn được dùng cho đến khi bạn hoàn tất kết nối OAuth của kênh đó.
+
+## 2. Điền App ID/Secret trên Vercel
+
+Vercel → nep-hp → Settings → Environment Variables → Add → chọn Production → Save:
+
+| Name | Value |
+| --- | --- |
+| PUBLIC_SITE_URL | https://nep-hp.vercel.app |
+| FACEBOOK_APP_ID | Facebook App ID trong Meta App Settings → Basic |
+| FACEBOOK_APP_SECRET | Facebook App Secret tương ứng |
+| THREADS_APP_ID | Threads App ID trong phần Threads API của app |
+| THREADS_APP_SECRET | Threads App Secret tương ứng |
+| INSTAGRAM_APP_ID | Instagram App ID trong API setup with Instagram login |
+| INSTAGRAM_APP_SECRET | Instagram App Secret tương ứng |
+
+Các App ID/Secret của ba nền tảng có thể khác nhau, không tráo lẫn. Chỉ điền các kênh muốn kết nối. Sau khi lưu, Deployments → Redeploy. Không dùng NEXT_PUBLIC_ cho khóa bí mật.
+
+META_GRAPH_VERSION giữ phiên bản Facebook đang dùng; nếu bỏ trống, OAuth Facebook dùng v26.0. INSTAGRAM_GRAPH_VERSION có thể đặt riêng cho Instagram. OAuth Threads dùng endpoint v1.0.
+
+## 3. Callback phải khai báo chính xác trong Meta
+
+| Nền tảng | Valid OAuth Redirect URI |
+| --- | --- |
+| Facebook | https://nep-hp.vercel.app/api/facebook/callback |
+| Instagram | https://nep-hp.vercel.app/api/instagram/callback |
+| Threads | https://nep-hp.vercel.app/api/threads/callback |
+
+Đây là ba callback riêng. Không khai báo callback Facebook trong phần Threads hoặc ngược lại. PUBLIC_SITE_URL phải khớp origin bạn dùng khi bấm kết nối. Website URL: https://nep-hp.vercel.app/; App Domains: nep-hp.vercel.app.
+
+## 4. OAuth Facebook Fanpage — từng bước
+
+### Cấu hình Meta
+
+1. Mở https://developers.facebook.com/apps/ → chọn ứng dụng Nếp.
+2. Mở Facebook Login hoặc Facebook Login for Business → Settings. Nếu chưa có, thêm use case/sản phẩm phù hợp với quản lý Fanpage.
+3. Bật Client OAuth Login / Web OAuth Login nếu dashboard yêu cầu. Trong Valid OAuth Redirect URIs, thêm chính xác callback Facebook ở bảng trên, Save.
+4. Đảm bảo app có các quyền pages_show_list, pages_read_engagement, pages_manage_posts. Người đăng nhập phải có quyền tạo nội dung/quản lý Page cần dùng.
+5. Khi app Development, dùng tài khoản có vai trò admin/developer/tester phù hợp. Nếu quản lý Page cho người ngoài vai trò, cần đáp ứng App Review/Advanced Access của Meta, và các yêu cầu doanh nghiệp nếu dashboard yêu cầu.
+6. Nếu app dùng Facebook Login for Business với Configuration: vào Configurations, tạo/chọn cấu hình phù hợp cho quản lý Page, cấp ba quyền trên và chọn loại token **User Access Token**. Copy Configuration ID vào FACEBOOK_LOGIN_CONFIG_ID trên Vercel rồi redeploy. Khi có config_id, Nếp dùng quyền trong cấu hình này thay cho scope trực tiếp trong URL, nên cấu hình phải có đủ quyền Page. Nếu không dùng cấu hình này thì để biến trống.
+
+### Kết nối và chọn Fanpage trong Nếp
+
+1. Mở Nếp → Kết nối & thiết lập → Kết nối Facebook Fanpage.
+2. Bấm Kết nối Facebook Fanpage. Trình duyệt đến trang Facebook thật.
+3. Đăng nhập, chọn các Page/tài sản muốn cấp quyền và đồng ý quyền cần thiết.
+4. Facebook quay về Nếp. Nếp hiện danh sách tên và ID Page, không hiển thị token.
+5. Chọn đúng Page **Nếp** (hoặc Page bạn muốn dùng) rồi bấm **Dùng Fanpage này**. Chưa bấm lưu thì đích đăng cũ chưa thay đổi. Danh sách chọn có hiệu lực 10 phút, quá thời gian cần kết nối lại.
+6. Kiểm tra tên/ID đã lưu. Vào Nội dung AI, tạo bài Facebook, kiểm tra đích và duyệt đăng.
+7. Nếu không có Page trong danh sách, kiểm tra quyền quản lý của user, ba quyền Page và các tài sản đã chọn lúc cấp quyền. Nếp không tự bịa Page ID hoặc dùng token tài khoản cá nhân để đăng.
+
+Page token được lấy phía server từ User token đã đổi dài hạn. Meta không trả mốc expires_in riêng của từng Page trong bước lấy danh sách này, nên giao diện không khẳng định Page token tồn tại vĩnh viễn. Nếu quyền bị thu hồi/token không dùng được, kết nối lại. Nút kết nối lại cũng dùng để đổi Page.
+
+## 5. OAuth Threads — từng bước
+
+1. Meta Developers → Nếp → Use cases → Access the Threads API → Customize / API setup.
+2. Tìm phần OAuth / Redirect callback URLs / Redirect URIs, thêm chính xác callback Threads ở bảng trên rồi Save.
+3. Đảm bảo có hai quyền threads_basic và threads_content_publish.
+4. Nếu app Development: App roles → thêm Threads Tester bằng tài khoản muốn đăng. Dùng chính tài khoản Threads đó chấp nhận lời mời trong cài đặt website/ứng dụng hoặc phần lời mời tester. Facebook developer role không tự thay cho mọi bước chấp nhận Threads tester.
+5. Copy **Threads App ID** và **Threads App Secret** của app sang hai biến Vercel tương ứng; redeploy. Không dùng Facebook App ID hoặc Instagram App ID cho Threads.
+6. Nếp → Kết nối & thiết lập → Kết nối Threads → bấm nút. Trang cấp quyền chính thức hiện tại dùng threads.com; API vẫn dùng graph.threads.net.
+7. Đăng nhập đúng Threads, cấp quyền. Khi quay về Nếp, kiểm tra @username, ID và ngày hết hạn.
+8. Vào Nội dung AI → tạo bài Threads → duyệt và đăng.
+
+Token được đổi sang dài hạn theo API Meta. Nút Gia hạn token chỉ dùng khi token còn hạn và đã qua ít nhất 24 giờ kể từ lần cấp/gia hạn gần nhất. Token hết hạn/thu hồi cần Kết nối Threads lại. Chưa có cron gia hạn tự động khi web đóng.
+
+## 6. Instagram
+
+Giữ luồng OAuth Instagram ở bản 2.2: Instagram App ID/Secret riêng, callback Instagram riêng, quyền instagram_business_basic và instagram_business_content_publish. Tài khoản cần Business/Creator. Hướng dẫn chi tiết bản 2.2 nằm ngay dưới phần này. Facebook OAuth mới không tự đổi sang Instagram token hoặc ghi đè kết nối Instagram.
+
+## 7. Đổi tài khoản, ngắt kết nối và token cũ
+
+- Kết nối từng kênh độc lập. Một quản trị viên có một Page và một tài khoản Threads OAuth đang được dùng tại một thời điểm.
+- Khi chuyển Page/tài khoản, bản nháp vẫn giữ nội dung. Nếu UI đang duyệt đích cũ, server từ chối đăng khi expectedTargetId không khớp để bạn làm mới và duyệt lại.
+- Ngắt OAuth xóa token OAuth tại Nếp, giữ dấu trạng thái đã ngắt để không âm thầm quay về token cũ trong Vercel. Bài đã đăng vẫn còn. Quyền trên Meta cần gỡ riêng trong cài đặt của nền tảng nếu muốn thu hồi.
+- Khi chưa từng kết nối OAuth của kênh đó, cấu hình FACEBOOK_PAGE_ID/FACEBOOK_PAGE_ACCESS_TOKEN hoặc THREADS_USER_ID/THREADS_ACCESS_TOKEN cũ vẫn dùng được. Hoàn tất OAuth xong thì không cần các biến token/ID thủ công của kênh đó nữa.
+- Token được mã hóa AES-256-GCM. Mặc định mỗi kênh có khóa dẫn xuất riêng từ App Secret. Có thể đặt SOCIAL_TOKEN_ENCRYPTION_SECRET phía server để dùng khóa mã hóa riêng. Đổi khóa/App Secret đang dùng có thể khiến token cũ không giải mã được và cần kết nối lại.
+- Callback dùng state ngẫu nhiên, cookie riêng từng nền tảng và nonce ràng buộc provider, chỉ dùng một lần trong 10 phút. Bảng token và danh sách Page tạm không cho browser đọc/ghi trực tiếp. Chỉ ID/tên/trạng thái được trả về UI; token không trả về browser.
+
+## 8. Kiểm tra lỗi
+
+- Nút kết nối khóa: kiểm tra đúng cặp App ID/Secret của kênh, chạy SQL mới và redeploy.
+- Redirect mismatch: callback trong Meta phải khớp đúng scheme/domain/path Nếp hiển thị. Không chia sẻ URL callback có code/state hoặc tự mở callback bằng tay.
+- Facebook báo thiếu configuration: tạo/chọn cấu hình Login for Business phù hợp, điền FACEBOOK_LOGIN_CONFIG_ID và redeploy.
+- Threads báo tester chưa chấp nhận: hoàn tất lời mời bằng chính tài khoản Threads; không đổi App ID tùy tiện.
+- Không có Page: kiểm tra user quản lý Page, scope/configuration và tài sản đã cấp. Cấp lại quyền nếu cần.
+- Cần xác minh sau khi đăng: kiểm tra bài trên nền tảng trước khi xử lý trạng thái, không tự gửi lại để tránh trùng.
+
+Đã kiểm tra bằng build/TypeScript và phản hồi API mô phỏng cho luồng cấp token, phân trang Page, nonce một lần, quyền bảng và đăng bài. Chưa hoàn tất OAuth thật hoặc đăng bài thật bằng tài khoản Meta của bạn. Bạn cần tự điền App Secret trên Vercel và đồng ý cấp quyền trên trang Meta.
+
+Tài liệu chính thức:
+- https://developers.facebook.com/documentation/facebook-login/guides/advanced/manual-flow
+- https://developers.facebook.com/documentation/facebook-login/guides/access-tokens/get-long-lived
+- https://developers.facebook.com/documentation/facebook-login/facebook-login-for-business.md
+- https://developers.facebook.com/documentation/threads/get-started/get-access-tokens-and-permissions
+- https://developers.facebook.com/documentation/threads/get-started/long-lived-tokens
+
+---
+
+# Tài liệu bản 2.2 và các bản trước
+
 # Nếp 2.2 — Kết nối Instagram bằng App ID và App Secret
 
 ## Bắt đầu tại đây: Instagram Login trực tiếp

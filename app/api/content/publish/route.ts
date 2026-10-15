@@ -1,3 +1,4 @@
+import {socialTarget} from '@/lib/social-connections';
 import {instagramTarget} from '@/lib/instagram-connection';
 import {authorize,env,failure,readBody} from '@/lib/content-server';
 import {hasDisclosure,validatePost,isChannel} from '@/lib/content-rules';
@@ -23,7 +24,7 @@ export async function POST(request:Request){
   if(approved!==true)throw new Error('Duyệt nội dung trước khi đăng.');
   if(post.channel==='instagram'&&!selectedImage)throw new Error('Instagram bắt buộc có ảnh.');
   const instagram=post.channel==='instagram',threads=post.channel==='threads';
-  const target=instagram?await instagramTarget(db,user.id):{id:env(threads?'THREADS_USER_ID':'FACEBOOK_PAGE_ID'),token:env(threads?'THREADS_ACCESS_TOKEN':'FACEBOOK_PAGE_ACCESS_TOKEN'),version:threads?'v1.0':env('META_GRAPH_VERSION')};
+  const target=instagram?await instagramTarget(db,user.id):await socialTarget(db,user.id,threads?'threads':'facebook');
   if(typeof expectedTargetId==='string'&&expectedTargetId&&expectedTargetId!==target.id)throw new Error('Tài khoản đích đã thay đổi. Làm mới và duyệt lại bài trước khi đăng.');
   if(!/^\d+$/.test(target.id)||!/^v\d+\.\d+$/.test(target.version))throw new Error('ID tài khoản hoặc phiên bản API không hợp lệ.');
   let imageUrl:string|undefined;
