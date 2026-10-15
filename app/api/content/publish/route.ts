@@ -1,3 +1,4 @@
+import {instagramTarget} from '@/lib/instagram-connection';
 import {authorize,env,failure,readBody} from '@/lib/content-server';
 import {hasDisclosure,validatePost,isChannel} from '@/lib/content-rules';
 import {signImage} from '@/lib/social-image-token';
@@ -5,7 +6,7 @@ import {publishSocial} from '@/lib/social-publish';
 export const runtime='nodejs';export const maxDuration=120;
 export async function POST(request:Request){
  try{
-  const {db,user}=await authorize(request);const {postId,body,approved,action,imageId}=await readBody(request);
+  const {db,user}=await authorize(request);const {postId,body,approved,action,imageId,expectedTargetId}=await readBody(request);
   if(typeof body!=='string')throw new Error('Nội dung không hợp lệ.');
   if(action!=='save'&&action!=='publish')throw new Error('Thao tác không hợp lệ.');
   const {data:post,error}=await db.from('affiliate_content_posts').select('*').eq('id',postId).eq('owner_id',user.id).single();
@@ -22,7 +23,8 @@ export async function POST(request:Request){
   if(approved!==true)throw new Error('Duyệt nội dung trước khi đăng.');
   if(post.channel==='instagram'&&!selectedImage)throw new Error('Instagram bắt buộc có ảnh.');
   const instagram=post.channel==='instagram',threads=post.channel==='threads';
-  const target={id:env(instagram?'INSTAGRAM_USER_ID':threads?'THREADS_USER_ID':'FACEBOOK_PAGE_ID'),token:instagram?(process.env.INSTAGRAM_ACCESS_TOKEN?.trim()||env('FACEBOOK_PAGE_ACCESS_TOKEN')):env(threads?'THREADS_ACCESS_TOKEN':'FACEBOOK_PAGE_ACCESS_TOKEN'),version:threads?'v1.0':env('META_GRAPH_VERSION')};
+  const target=instagram?await instagramTarget(db,user.id):{id:env(threads?'THREADS_USER_ID':'FACEBOOK_PAGE_ID'),token:env(threads?'THREADS_ACCESS_TOKEN':'FACEBOOK_PAGE_ACCESS_TOKEN'),version:threads?'v1.0':env('META_GRAPH_VERSION')};
+  if(typeof expectedTargetId==='string'&&expectedTargetId&&expectedTargetId!==target.id)throw new Error('Tài khoản đích đã thay đổi. Làm mới và duyệt lại bài trước khi đăng.');
   if(!/^\d+$/.test(target.id)||!/^v\d+\.\d+$/.test(target.version))throw new Error('ID tài khoản hoặc phiên bản API không hợp lệ.');
   let imageUrl:string|undefined;
   if(selectedImage){const base=new URL(env('PUBLIC_SITE_URL'));if(base.protocol!=='https:')throw new Error('PUBLIC_SITE_URL phải dùng HTTPS.');imageUrl=new URL(`/api/social-image/${signImage(selectedImage,process.env.SOCIAL_IMAGE_SIGNING_SECRET||env('SUPABASE_SERVICE_ROLE_KEY'))}/`,base.origin).href;}

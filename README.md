@@ -1,3 +1,7 @@
+# Nếp 2.2 — Instagram Login trực tiếp
+
+Đọc phần đầu **HUONG-DAN-META.md** để dùng Instagram App ID/Secret với nút Kết nối Instagram tại https://nep-hp.vercel.app. Chạy thêm supabase/instagram-oauth.sql. Token được mã hóa, giữ riêng phía server; không cần lấy token thủ công trong Explorer.
+
 # Nếp 2.1 — Nội dung ngắn và ba kênh Meta
 
 Source được sửa từ nep.zip người dùng cung cấp. Next.js App Router + Supabase, chạy server trên Vercel.

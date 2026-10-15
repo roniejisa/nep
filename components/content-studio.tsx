@@ -31,7 +31,7 @@ export default function ContentStudio({products,onProductsChanged}:{products:Pro
  }
  async function submit(post:Post,action:'save'|'publish'){
   setBusy(post.id);setError('');setNotice('');
-  try{const r=await api('publish',{postId:post.id,body:post.body,imageId:post.image_id||null,action,approved:!!approved[post.id]});setPosts(old=>old.map(p=>p.id===post.id?r.post:p));setApproved(old=>({...old,[post.id]:false}));setNotice(action==='save'?'Đã lưu chỉnh sửa.':`Đã đăng ${channelNames[post.channel]} · mã bài ${r.post.external_id}`);}
+  try{const r=await api('publish',{postId:post.id,body:post.body,expectedTargetId:post.target_id||targets[post.channel],imageId:post.image_id||null,action,approved:!!approved[post.id]});setPosts(old=>old.map(p=>p.id===post.id?r.post:p));setApproved(old=>({...old,[post.id]:false}));setNotice(action==='save'?'Đã lưu chỉnh sửa.':`Đã đăng ${channelNames[post.channel]} · mã bài ${r.post.external_id}`);}
   catch(e){setError(e instanceof Error?e.message:'Không đăng được.');try{const r=await api('status');setPosts(old=>old.map(p=>{const latest=r.posts.find((x:Post)=>x.id===p.id);return latest&&latest.status!=='draft'?latest:p;}));}catch{}}
   finally{setBusy('');}
  }

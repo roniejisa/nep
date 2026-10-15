@@ -1,0 +1,6 @@
+import {createHash,createHmac,randomBytes,createCipheriv,createDecipheriv,timingSafeEqual} from 'node:crypto';
+export function stateHash(state:string){return createHash('sha256').update(state).digest('hex');}
+export function sameState(a:string,b:string){const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&x.length>0&&timingSafeEqual(x,y);}
+function key(secret:string){if(!secret)throw new Error('Thiếu khóa mã hóa Instagram.');return createHmac('sha256',secret).update('nep-instagram-token-encryption-v1').digest();}
+export function encryptToken(token:string,secret:string){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key(secret),iv);const ciphertext=Buffer.concat([cipher.update(token,'utf8'),cipher.final()]);return ['v1',iv.toString('base64url'),cipher.getAuthTag().toString('base64url'),ciphertext.toString('base64url')].join('.');}
+export function decryptToken(value:string,secret:string){const [version,iv,tag,ciphertext,...rest]=value.split('.');if(version!=='v1'||rest.length||!iv||!tag||!ciphertext)throw new Error('Token mã hóa không hợp lệ.');const decipher=createDecipheriv('aes-256-gcm',key(secret),Buffer.from(iv,'base64url'));decipher.setAuthTag(Buffer.from(tag,'base64url'));return Buffer.concat([decipher.update(Buffer.from(ciphertext,'base64url')),decipher.final()]).toString('utf8');}

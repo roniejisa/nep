@@ -1,5 +1,5 @@
 import type {Channel} from './content-rules';
-export type SocialTarget={id:string;token:string;version:string};
+export type SocialTarget={id:string;token:string;version:string;instagramLogin?:'facebook'|'instagram'};
 export async function metaRequest(url:string,token:string,values?:Record<string,string>,transport:typeof fetch=fetch){
  const response=await transport(url,{method:values?'POST':'GET',headers:{Authorization:`Bearer ${token}`},body:values?new URLSearchParams(values):undefined,signal:AbortSignal.timeout(15000),redirect:'error',cache:'no-store'});
  let data;try{data=await response.json();}catch{throw new Error(`Meta trả phản hồi không hợp lệ (HTTP ${response.status}).`);}
@@ -9,7 +9,7 @@ export async function metaRequest(url:string,token:string,values?:Record<string,
 export async function publishSocial(options:{channel:Channel;body:string;imageUrl?:string;target:SocialTarget;onContainer:(id:string)=>Promise<void>;transport?:typeof fetch;pause?:(ms:number)=>Promise<void>}){
  const {channel,body,imageUrl,target,onContainer}=options;const transport=options.transport??fetch;const pause=options.pause??(ms=>new Promise(resolve=>setTimeout(resolve,ms)));
  if(channel==='instagram'&&!imageUrl)throw new Error('Instagram cần ảnh.');
- const host=channel==='threads'?'https://graph.threads.net/v1.0':`https://graph.facebook.com/${target.version}`;
+ const host=channel==='threads'?'https://graph.threads.net/v1.0':channel==='instagram'&&target.instagramLogin==='instagram'?`https://graph.instagram.com/${target.version}`:`https://graph.facebook.com/${target.version}`;
  const send=async(path:string,values:Record<string,string>)=>{const r=await metaRequest(`${host}/${path}`,target.token,values,transport);if(!r.id)throw new Error('Meta chưa trả mã nội dung.');return String(r.id);};
  if(channel==='facebook'){
   const id=imageUrl?await send(`${target.id}/photos`,{url:imageUrl,caption:body,published:'true'}):await send(`${target.id}/feed`,{message:body});return {id};

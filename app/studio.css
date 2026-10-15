@@ -14,3 +14,5 @@
 .platform-tabs{min-width:0;max-width:100%}
 .social-post .studio-field{width:100%}
 @media(max-width:650px){.social-post{padding:18px}.post-editor{font-size:16px;min-height:280px}.post-text-preview p{font-size:15px}.social-post header>div>span{font-size:12px}.post-approval{font-size:12px}.post-state{font-size:11px}.post-mode button{font-size:12px;padding:9px 11px}}
+
+.instagram-connect{background:#fffaf9;border:1px solid #eadfdc;border-radius:15px;padding:22px;margin:24px 0}.instagram-connect-title{display:flex;align-items:center;gap:12px;color:#a26c79}.instagram-connect-title h3{margin:0!important;font-size:16px}.instagram-connect p{font-size:12px;line-height:1.8;color:#897780;margin:12px 0}.instagram-connected{display:grid;gap:7px;padding:16px;background:white;border:1px solid #f0e6e5;border-radius:10px;margin:16px 0;font-size:12px;color:#86747c;overflow-wrap:anywhere}.instagram-connected strong{font-size:17px;color:#835d6b}.instagram-connect .button-row{flex-wrap:wrap}.instagram-connect input{min-width:0}@media(max-width:650px){.instagram-connect{padding:16px}.instagram-connect .button-row .btn{width:100%}}

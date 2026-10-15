@@ -1,3 +1,90 @@
+# Nếp 2.2 — Kết nối Instagram bằng App ID và App Secret
+
+## Bắt đầu tại đây: Instagram Login trực tiếp
+
+Từ bản 2.2, bạn có thể kết nối Instagram ngay trong quản trị bằng nút Kết nối Instagram. Luồng này dùng Instagram App ID và Instagram App Secret; server tự nhận access token, đổi token dài hạn và lưu mã hóa. Không cần lấy token trong Graph API Explorer. Không nhập mật khẩu Instagram vào Nếp.
+
+### Bước 1 — Cập nhật source và SQL
+
+1. Đưa source mới lên repository GitHub đang kết nối Vercel.
+2. Nếu chưa chạy social-v2.sql từ các bản trước, chạy script đó trước để có Instagram/ảnh. Sau đó chạy thêm supabase/instagram-oauth.sql trong Supabase SQL Editor. Script mới tạo hai bảng riêng cho nonce và token đã mã hóa, không xóa sản phẩm/bài đăng.
+3. Giữ SUPABASE_SERVICE_ROLE_KEY, CONTENT_ADMIN_USER_ID, các khóa AI và token Facebook/Threads đang hoạt động.
+
+### Bước 2 — Cấu hình trong Meta Developers
+
+1. Mở https://developers.facebook.com/apps/ → chọn app Nếp.
+2. Mở phần Instagram / use case Instagram → API setup with Instagram login. Đây là luồng Instagram Login trực tiếp, khác Facebook Login của hướng dẫn cũ bên dưới.
+3. Sao chép **Instagram App ID** và **Instagram App Secret** ở chính phần này. Không lấy Facebook App ID/Secret ở Basic Settings để thay nếu Meta hiển thị cặp Instagram riêng.
+4. Trong phần Instagram business login / Business login settings → Valid OAuth Redirect URIs, thêm chính xác:
+
+```
+https://nep-hp.vercel.app/api/instagram/callback
+```
+
+5. Nếu dashboard hỏi Website URL, dùng https://nep-hp.vercel.app/; App Domains dùng nep-hp.vercel.app (không có https:// hoặc đường dẫn).
+6. Cấp/thiết lập hai quyền của luồng này: instagram_business_basic và instagram_business_content_publish. Không dùng instagram_basic/instagram_content_publish cho luồng mới.
+7. Nếu app còn Development, tài khoản thử cần vai trò phù hợp trong app; thêm Instagram tester theo phần roles/API setup và chấp nhận lời mời trên tài khoản Instagram. Tài khoản đăng nhập cần là Business/Creator. Muốn hỗ trợ người dùng ngoài vai trò có thể cần App Review/Advanced Access theo Meta.
+8. Chính sách riêng tư / điều khoản / hướng dẫn xóa dữ liệu vẫn là các trang công khai đã tạo. Cập nhật nội dung chính sách để mô tả token được mã hóa và lưu tại Supabase khi kết nối trực tiếp, không chỉ nằm trong biến môi trường.
+
+Tên menu Meta có thể khác theo app/giao diện; tìm nhãn tiếng Anh tương ứng. Nếu vẫn gặp Invalid platform app sau khi đã dùng nút trên website, kiểm tra đã bật Instagram Login và dùng đúng Instagram App ID, không phải ID Fanpage hoặc Facebook App ID.
+
+### Bước 3 — Điền biến trên Vercel
+
+Vercel → nep-hp → Settings → Environment Variables → Add:
+
+| Name | Value |
+| --- | --- |
+| PUBLIC_SITE_URL | https://nep-hp.vercel.app |
+| INSTAGRAM_APP_ID | Instagram App ID từ API setup with Instagram login |
+| INSTAGRAM_APP_SECRET | Instagram App Secret từ cùng phần setup |
+
+Chọn Production, Save, sau đó Deployments → Redeploy. Không dùng tiền tố NEXT_PUBLIC_ cho App Secret. Không gửi secret vào chat hoặc commit vào repository.
+
+Tùy chọn INSTAGRAM_GRAPH_VERSION có thể đặt theo phiên bản Meta app đang hỗ trợ. Nếu bỏ trống, server dùng META_GRAPH_VERSION đang có, sau đó mới mặc định v26.0.
+
+Khi dùng nút kết nối trực tiếp, không cần điền INSTAGRAM_USER_ID hoặc INSTAGRAM_ACCESS_TOKEN trên Vercel nữa. Source lấy ID/token từ kết quả OAuth đã mã hóa. Khi đã cấu hình App ID/Secret, hệ thống yêu cầu kết nối trực tiếp thay vì âm thầm lấy token Page cũ để đăng nhầm tài khoản. Facebook và Threads giữ cấu hình riêng.
+
+### Bước 4 — Kết nối trong Nếp
+
+1. Mở https://nep-hp.vercel.app/, đăng nhập quản trị.
+2. Vào Kết nối & thiết lập → Kết nối Instagram trực tiếp.
+3. Bấm Kết nối Instagram. Trình duyệt chuyển đến instagram.com để bạn đăng nhập và cấp quyền.
+4. Chọn đúng tài khoản Business/Creator, đồng ý các quyền cần thiết.
+5. Instagram quay lại callback rồi chuyển về Thiết lập. Nếp hiện @username, Instagram User ID và ngày hết hạn; không hiển thị token.
+6. Kiểm tra đúng tài khoản đích. Vào Nội dung AI → chọn Instagram và ảnh → tạo/duyệt bài → Đăng bài.
+
+Dữ liệu OAuth được bảo vệ bằng state ngẫu nhiên, cookie HttpOnly/Secure/SameSite=Lax và nonce một lần phía server. Token được mã hóa AES-256-GCM trước khi lưu; bảng token không cho browser đọc hoặc ghi trực tiếp. Không có token được chuyển trong URL trở lại giao diện hoặc trả về API trạng thái.
+
+### Gia hạn và ngắt kết nối
+
+- Nút Gia hạn token yêu cầu token còn hạn và đã qua ít nhất 24 giờ kể từ lần cấp/gia hạn gần nhất. Đây là thao tác chủ động; chưa có cron tự gia hạn khi website đóng.
+- Nếu token đã hết hạn hoặc bị thu hồi, bấm Kết nối lại và cấp quyền lại.
+- Token mặc định được mã hóa bằng khóa dẫn xuất từ INSTAGRAM_APP_SECRET theo ngữ cảnh riêng. Có thể đặt INSTAGRAM_TOKEN_ENCRYPTION_SECRET làm khóa mã hóa riêng phía server. Nếu thay App Secret/khóa mã hóa đang dùng, kết nối cũ có thể không giải mã được và cần kết nối lại. Không tự xóa secret đang dùng trước khi chuẩn bị reconnect.
+- Ngắt kết nối xóa token lưu tại Nếp và các nonce chờ của quản trị viên. Không xóa bài đã đăng. Nếu muốn thu hồi quyền tại Meta, gỡ ứng dụng trong phần quản lý ứng dụng của Instagram.
+
+### Khi có lỗi
+
+- Nút kết nối bị khóa, thiếu cấu hình: kiểm tra hai biến Instagram App ID/Secret và redeploy.
+- Báo cần SQL: chạy instagram-oauth.sql trên đúng dự án Supabase.
+- Phiên hết hạn/không khớp: bắt đầu lại từ nút Kết nối Instagram trên đúng trình duyệt Production; không mở callback bằng tay hoặc chia sẻ URL cấp quyền giữa các máy.
+- Redirect URI mismatch: URL trong Meta phải khớp chính xác URL Nếp hiển thị, gồm HTTPS, hostname và đường dẫn. Không điền URL Preview hoặc http://localhost cho Production.
+- Quay về báo failed: kiểm tra App ID/Secret đúng luồng Instagram, callback, vai trò tester, tài khoản Professional và quyền đã cấp; không chụp token/secret trong ảnh gửi hỗ trợ.
+- Kết nối đọc được profile chưa bảo đảm publish thành công: cần quyền content publish và app access level phù hợp. Khi xuất bản lỗi, dùng mã Meta/code phụ để xử lý, không tự gửi trùng bài.
+
+### Kiểm chứng bản 2.2
+
+Đã có test cho state, nonce một lần/hết hạn, token mã hóa/chống sửa, đổi code sang long-lived token bằng phản hồi mô phỏng, bảng private và host graph.instagram.com khi đăng bài. Chưa thể hoàn tất OAuth thật vì App ID/Secret của bạn chưa được cấu hình trong môi trường bàn giao; cần bạn cấp quyền trên Instagram sau khi triển khai. Chưa truy cập hay thay đổi Vercel/Meta của bạn.
+
+Tài liệu chính thức:
+- https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/business-login
+- https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/get-started
+
+---
+
+# Tài liệu bản trước — tham khảo cho Facebook Login / Threads / AI
+
+Phần Instagram với Facebook Login dưới đây chỉ áp dụng khi bạn chủ động giữ luồng cũ và chưa bật Instagram Login trực tiếp. Đừng trộn loại App ID, quyền hoặc token giữa hai luồng.
+
 # Nếp 2.0 — Cài đặt Instagram và Threads từng bước
 
 Bản này được sửa từ nep.zip bạn gửi, giữ đường đăng Facebook Fanpage đã hoạt động. Hai kênh mới dùng token riêng. Không cần gửi bất kỳ token hoặc App Secret nào cho người khác.
