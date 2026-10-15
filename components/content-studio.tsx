@@ -21,13 +21,18 @@ export default function ContentStudio({products}:{products:Product[]}) {
  const [approved,setApproved]=useState<Record<string,boolean>>({});
  const [config,setConfig]=useState({ai:false,facebook:false,threads:false});
  const [targets,setTargets]=useState({facebook:'',threads:''});
+ const [aiInfo,setAiInfo]=useState<{providers:Record<string,boolean>;defaults:Record<string,string>;suggestions:Record<string,string[]>}>({providers:{},defaults:{},suggestions:{}});
+ const [provider,setProvider]=useState('auto');
+ const [model,setModel]=useState('');
+ useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem('nep-ai-choice')||'{}');if(saved.provider)setProvider(saved.provider);if(saved.model)setModel(saved.model);}catch{/* bỏ qua */}},[]);
+ useEffect(()=>{try{localStorage.setItem('nep-ai-choice',JSON.stringify({provider,model}));}catch{/* bỏ qua */}},[provider,model]);
  const refresh=useCallback(async()=>{
-  const result=await api('status');setPosts(result.posts);setConfig(result.configured);setTargets(result.targets);setApproved({});
+  const result=await api('status');setPosts(result.posts);setAiInfo(result.ai);setConfig(result.configured);setTargets(result.targets);setApproved({});
  },[]);
  useEffect(()=>{void refresh().catch(e=>setError(e.message));},[refresh]);
  async function generate(){
   setBusy('generate');setError('');setNotice('');
-  try{const result=await api('generate',{productId:selected});setPosts(old=>[...result.posts,...old]);setNotice(`Đã lưu hai bản nháp. Token sử dụng: ${result.tokens ?? 'chưa xác định'}. Hãy kiểm tra thông tin trước khi duyệt.`);}
+  try{const result=await api('generate',{productId:selected,provider,model:provider==='auto'?'':model});setPosts(old=>[...result.posts,...old]);setNotice(`Đã lưu hai bản nháp (do ${({gemini:'Gemini',anthropic:'Claude',openai:'ChatGPT'} as Record<string,string>)[result.provider] ?? 'AI'} viết). Token sử dụng: ${result.tokens ?? 'chưa xác định'}. Hãy kiểm tra thông tin trước khi duyệt.`);}
   catch(e){setError(e instanceof Error?e.message:'Không tạo được bài.');}finally{setBusy('');}
  }
  async function submit(post:Post,action:'save'|'publish'){
@@ -44,6 +49,8 @@ export default function ContentStudio({products}:{products:Product[]}) {
    <div className="content-connections">{(['ai','facebook','threads'] as const).map(key=><span key={key}>{config[key]?'●':'○'} {key==='ai'?'AI':key==='facebook'?'Facebook Page':'Threads'}: {config[key]?'Đã điền cấu hình':'Thiếu cấu hình'}</span>)}</div>
    <small>Trạng thái trên chỉ kiểm tra biến môi trường, chưa xác nhận token còn hiệu lực.</small>
    <div className="content-controls"><label>Sản phẩm<select value={selected} disabled={!!busy} onChange={e=>setSelected(e.target.value)}><option value="">Chọn sản phẩm đã có mô tả</option>{products.filter(p=>p.status!=='archived').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+   <label>AI viết bài<select value={provider} disabled={!!busy} onChange={e=>{setProvider(e.target.value);setModel('');}}><option value="auto">Tự động (Gemini trước, lỗi thì AI khác)</option>{(['gemini','anthropic','openai'] as const).map(p=><option key={p} value={p} disabled={!aiInfo.providers[p]}>{({gemini:'Gemini (có gói miễn phí)',anthropic:'Claude',openai:'ChatGPT'})[p]}{aiInfo.providers[p]?'':' — chưa điền khóa'}</option>)}</select></label>
+   {provider!=='auto'&&<label>Model<input list="nep-models" value={model} disabled={!!busy} placeholder={aiInfo.defaults[provider]||'Mặc định'} onChange={e=>setModel(e.target.value)}/><datalist id="nep-models">{(aiInfo.suggestions[provider]||[]).map(m=><option key={m} value={m}/>)}</datalist></label>}
    <button className="btn primary" disabled={!selected||!!busy||!config.ai} onClick={()=>void generate()}><Sparkles size={17}/>{busy==='generate'?'Đang viết và rà soát…':'Tạo nội dung AI'}</button></div>
    <p className="content-muted">Tối đa 30 lượt/24 giờ · 2.200 token đầu ra/lượt · chờ AI tối đa 60 giây. AI không bảo đảm bài sẽ có nhiều tương tác. Bản này đăng chữ + link, chưa đính kèm ảnh hoặc lên lịch.</p>
   </div>

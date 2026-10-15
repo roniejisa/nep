@@ -14,8 +14,11 @@ Bản này chạy Next.js server trên Vercel. Không dùng static export: các 
 | --- | --- |
 | SUPABASE_SERVICE_ROLE_KEY | Service-role key của đúng dự án Supabase đang lưu sản phẩm. Đây là khóa bí mật; chỉ đặt phía server. |
 | CONTENT_ADMIN_USER_ID | UUID tài khoản của bạn trong Supabase Authentication > Users, không phải project ID. Chỉ UUID này được dùng AI/đăng lên các tài khoản Meta cấu hình bên dưới. |
-| OPENAI_API_KEY | API key dự án OpenAI của bạn có ngân sách API. |
-| OPENAI_MODEL | Ví dụ `gpt-4.1-mini`; có thể thay bằng model hỗ trợ Responses và Structured Outputs mà tài khoản bạn được phép dùng. |
+| GEMINI_API_KEY | Khóa miễn phí từ Google AI Studio (https://aistudio.google.com/apikey). Được thử đầu tiên. |
+| GEMINI_MODEL | Tùy chọn, mặc định `gemini-3.1-flash-lite`. |
+| ANTHROPIC_API_KEY / ANTHROPIC_MODEL | Tùy chọn, dự phòng Claude (mặc định `claude-haiku-5-5`). |
+| OPENAI_API_KEY / OPENAI_MODEL | Tùy chọn, dự phòng ChatGPT (mặc định `gpt-4.1-mini`). |
+| AI_PROVIDER_ORDER | Tùy chọn, mặc định `gemini,anthropic,openai`. |
 | FACEBOOK_PAGE_ID | ID Fanpage muốn đăng, không phải ID tài khoản Facebook cá nhân. |
 | FACEBOOK_PAGE_ACCESS_TOKEN | Page access token có quyền đăng lên đúng Page. |
 | META_GRAPH_VERSION | Phiên bản Graph API đang được Meta app của bạn hỗ trợ, dạng `v25.0`. |
@@ -95,7 +98,7 @@ Nếu chưa có bảng hoặc Supabase tạm không đọc được cấu hình,
 
 ### Điền khóa theo thứ tự dễ kiểm tra
 - Bước A: hai biến Supabase/admin ở trên.
-- Bước B: OPENAI_API_KEY và OPENAI_MODEL=gpt-4.1-mini; redeploy rồi thử Tạo nội dung AI với một sản phẩm có mô tả.
+- Bước B: GEMINI_API_KEY (hoặc ANTHROPIC_API_KEY / OPENAI_API_KEY); redeploy rồi thử Tạo nội dung AI với một sản phẩm có mô tả.
 - Bước C: FACEBOOK_PAGE_ID, FACEBOOK_PAGE_ACCESS_TOKEN và META_GRAPH_VERSION; token phải của Page, không phải App Secret.
 - Bước D: THREADS_USER_ID và THREADS_ACCESS_TOKEN; ID/token phải của tài khoản Threads, không phải app.
 - Mỗi lần đổi biến môi trường, redeploy. Chọn Production cho website chính; không cần đưa khóa production sang Preview nếu không dùng Preview để thử tích hợp.
