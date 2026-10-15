@@ -1,70 +1,65 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { Sparkles, Send, Save, RefreshCw } from 'lucide-react';
-import { supabase, type Product } from '@/lib/supabase';
-type Post = { id:string;product_id:string|null;channel:'facebook'|'threads';body:string;review:string;status:string;external_id:string|null;target_id:string|null };
-const labels:Record<string,string>={draft:'Bản nháp',publishing:'Đang gửi / cần xác minh',published:'Đã đăng',unknown:'Cần xác minh trên Meta'};
-async function api(path:string,body?:unknown) {
- const {data}=await supabase.auth.getSession();
- if(!data.session) throw new Error('Vui lòng đăng nhập.');
- const response=await fetch(`/api/content/${path}`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
- const result=await response.json();
- if(!response.ok) throw new Error(result.error || 'Yêu cầu thất bại.');
- return result;
-}
-export default function ContentStudio({products}:{products:Product[]}) {
- const [selected,setSelected]=useState('');
- const [posts,setPosts]=useState<Post[]>([]);
- const [busy,setBusy]=useState('');
- const [error,setError]=useState('');
- const [notice,setNotice]=useState('');
+import AIImagePanel from '@/components/ai-image-panel';
+import {useCallback,useEffect,useState} from 'react';
+import {Sparkles,Send,Save,RefreshCw,Copy,Check,ImagePlus,ArrowRight,Instagram,Facebook,AtSign} from 'lucide-react';
+import {supabase,type Product} from '@/lib/supabase';
+import {channelNames,copyLengths,type Channel,type CopyLength} from '@/lib/content-rules';
+type Post={id:string;product_id:string|null;channel:Channel;body:string;review:string;status:string;external_id:string|null;target_id:string|null;image_id?:string|null;provider?:string;model?:string};
+type AIInfo={providers:Record<string,boolean>;defaults:Record<string,string>;suggestions:Record<string,string[]>};
+const statuses:Record<string,string>={draft:'Bản nháp',publishing:'Đang gửi · cần kiểm tra',published:'Đã đăng',unknown:'Cần xác minh'};
+const icons={facebook:Facebook,instagram:Instagram,threads:AtSign};
+async function api(path:string,body?:unknown){const {data}=await supabase.auth.getSession();if(!data.session)throw new Error('Vui lòng đăng nhập.');const r=await fetch(`/api/content/${path}`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const result=await r.json();if(!r.ok)throw new Error(result.error||'Thao tác thất bại.');return result;}
+export default function ContentStudio({products,onProductsChanged}:{products:Product[];onProductsChanged:()=>Promise<void>}){
+ const [selected,setSelected]=useState(''),[imageId,setImageId]=useState('');
+ const [posts,setPosts]=useState<Post[]>([]),[busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [approved,setApproved]=useState<Record<string,boolean>>({});
- const [config,setConfig]=useState({ai:false,facebook:false,threads:false});
- const [targets,setTargets]=useState({facebook:'',threads:''});
- const [aiInfo,setAiInfo]=useState<{providers:Record<string,boolean>;defaults:Record<string,string>;suggestions:Record<string,string[]>}>({providers:{},defaults:{},suggestions:{}});
- const [provider,setProvider]=useState('auto');
- const [model,setModel]=useState('');
- useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem('nep-ai-choice')||'{}');if(saved.provider)setProvider(saved.provider);if(saved.model)setModel(saved.model);}catch{/* bỏ qua */}},[]);
- useEffect(()=>{try{localStorage.setItem('nep-ai-choice',JSON.stringify({provider,model}));}catch{/* bỏ qua */}},[provider,model]);
- const refresh=useCallback(async()=>{
-  const result=await api('status');setPosts(result.posts);setAiInfo(result.ai);setConfig(result.configured);setTargets(result.targets);setApproved({});
- },[]);
+ const [config,setConfig]=useState({ai:false,facebook:false,instagram:false,threads:false});
+ const [targets,setTargets]=useState({facebook:'',instagram:'',threads:''});
+ const [aiInfo,setAIInfo]=useState<AIInfo>({providers:{},defaults:{},suggestions:{}});
+ const [provider,setProvider]=useState('gemini'),[model,setModel]=useState(''),[length,setLength]=useState<CopyLength>('short'),[angle,setAngle]=useState('problem');
+ const [channels,setChannels]=useState<Channel[]>(['facebook','threads']);
+ const [tab,setTab]=useState<Channel|'all'>('all'),[filter,setFilter]=useState('draft'),[preview,setPreview]=useState<Record<string,boolean>>({});
+ const product=products.find(p=>p.id===selected);
+ const refresh=useCallback(async()=>{const r=await api('status');setPosts(r.posts);setAIInfo(r.ai);setConfig(r.configured);setTargets(r.targets);setApproved({});},[]);
  useEffect(()=>{void refresh().catch(e=>setError(e.message));},[refresh]);
- async function generate(){
+ useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem('nep-ai-choice')||'{}');if(['gemini','anthropic','openai','auto'].includes(saved.provider))setProvider(saved.provider);if(typeof saved.model==='string')setModel(saved.model);}catch{}},[]);
+ function chooseAI(p:string,m:string){setProvider(p);setModel(m);try{localStorage.setItem('nep-ai-choice',JSON.stringify({provider:p,model:m}));}catch{}}
+ async function generate(productId=selected,requested=channels,img=imageId){
   setBusy('generate');setError('');setNotice('');
-  try{const result=await api('generate',{productId:selected,provider,model:provider==='auto'?'':model});setPosts(old=>[...result.posts,...old]);setNotice(`Đã lưu hai bản nháp (do ${({gemini:'Gemini',anthropic:'Claude',openai:'ChatGPT'} as Record<string,string>)[result.provider] ?? 'AI'} viết). Token sử dụng: ${result.tokens ?? 'chưa xác định'}. Hãy kiểm tra thông tin trước khi duyệt.`);}
+  try{const r=await api('generate',{productId,provider,model:provider==='auto'?'':model,channels:requested,length,angle,imageId:img||null});setPosts(old=>[...r.posts,...old]);setFilter('draft');setTab(requested.length===1?requested[0]:'all');setNotice(`Đã tạo ${r.posts.length} bài ngắn bằng ${r.model}. ${r.tokens??'—'} token · đọc và duyệt trước khi đăng.`);}
   catch(e){setError(e instanceof Error?e.message:'Không tạo được bài.');}finally{setBusy('');}
  }
  async function submit(post:Post,action:'save'|'publish'){
   setBusy(post.id);setError('');setNotice('');
-  try{
-   const result=await api('publish',{postId:post.id,body:post.body,action,approved:approved[post.id]===true});
-   setPosts(old=>old.map(p=>p.id===post.id?result.post:p));setApproved(old=>({...old,[post.id]:false}));
-   setNotice(action==='save'?'Đã lưu bản chỉnh sửa.':`Đã đăng lên ${post.channel}. Mã bài: ${result.post.external_id}`);
-  }catch(e){setError(e instanceof Error?e.message:'Không đăng được bài.');try{const result=await api('status');setPosts(old=>old.map(p=>{const latest=result.posts.find((item:Post)=>item.id===p.id);return latest&&latest.status!=='draft'?latest:p;}));}catch{/* preserve original error and edits */}}
+  try{const r=await api('publish',{postId:post.id,body:post.body,imageId:post.image_id||null,action,approved:!!approved[post.id]});setPosts(old=>old.map(p=>p.id===post.id?r.post:p));setApproved(old=>({...old,[post.id]:false}));setNotice(action==='save'?'Đã lưu chỉnh sửa.':`Đã đăng ${channelNames[post.channel]} · mã bài ${r.post.external_id}`);}
+  catch(e){setError(e instanceof Error?e.message:'Không đăng được.');try{const r=await api('status');setPosts(old=>old.map(p=>{const latest=r.posts.find((x:Post)=>x.id===p.id);return latest&&latest.status!=='draft'?latest:p;}));}catch{}}
   finally{setBusy('');}
  }
- return <section className="content-studio">
-  <div className="setup-card"><h2>Từ sản phẩm đến bài đăng</h2><p>AI viết hai phiên bản, tự rà soát câu chữ và gắn link affiliate. Bạn đọc, sửa và duyệt từng bài trước khi gửi.</p>
-   <div className="content-connections">{(['ai','facebook','threads'] as const).map(key=><span key={key}>{config[key]?'●':'○'} {key==='ai'?'AI':key==='facebook'?'Facebook Page':'Threads'}: {config[key]?'Đã điền cấu hình':'Thiếu cấu hình'}</span>)}</div>
-   <small>Trạng thái trên chỉ kiểm tra biến môi trường, chưa xác nhận token còn hiệu lực.</small>
-   <div className="content-controls"><label>Sản phẩm<select value={selected} disabled={!!busy} onChange={e=>setSelected(e.target.value)}><option value="">Chọn sản phẩm đã có mô tả</option>{products.filter(p=>p.status!=='archived').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-   <label>AI viết bài<select value={provider} disabled={!!busy} onChange={e=>{setProvider(e.target.value);setModel('');}}><option value="auto">Tự động (Gemini trước, lỗi thì AI khác)</option>{(['gemini','anthropic','openai'] as const).map(p=><option key={p} value={p} disabled={!aiInfo.providers[p]}>{({gemini:'Gemini (có gói miễn phí)',anthropic:'Claude',openai:'ChatGPT'})[p]}{aiInfo.providers[p]?'':' — chưa điền khóa'}</option>)}</select></label>
-   {provider!=='auto'&&<label>Model<input list="nep-models" value={model} disabled={!!busy} placeholder={aiInfo.defaults[provider]||'Mặc định'} onChange={e=>setModel(e.target.value)}/><datalist id="nep-models">{(aiInfo.suggestions[provider]||[]).map(m=><option key={m} value={m}/>)}</datalist></label>}
-   <button className="btn primary" disabled={!selected||!!busy||!config.ai} onClick={()=>void generate()}><Sparkles size={17}/>{busy==='generate'?'Đang viết và rà soát…':'Tạo nội dung AI'}</button></div>
-   <p className="content-muted">Tối đa 30 lượt/24 giờ · 2.200 token đầu ra/lượt · chờ AI tối đa 60 giây. AI không bảo đảm bài sẽ có nhiều tương tác. Bản này đăng chữ + link, chưa đính kèm ảnh hoặc lên lịch.</p>
-  </div>
-  {error&&<div className="error-banner" role="alert">{error}</div>}
-  {notice&&<div className="connection-banner" role="status">{notice}</div>}
-  <div className="content-heading"><h2>Bản nháp & lịch sử</h2><button className="btn secondary" disabled={!!busy} onClick={()=>{if(posts.some(p=>p.status==='draft')&&!window.confirm('Làm mới sẽ tải bản đã lưu. Bạn đã lưu các chỉnh sửa chưa?'))return;void refresh().catch(e=>setError(e.message));}}><RefreshCw size={16}/> Làm mới</button></div>
-  {!posts.length&&<div className="setup-card"><p>Chọn một sản phẩm rồi nhấn “Tạo nội dung AI”. Bản nháp được lưu trong Supabase để bạn mở lại sau.</p><a href="/content.sql" download>Tải SQL cho tính năng nội dung</a></div>}
-  <div className="content-grid">{posts.map(post=><article className="setup-card content-post" key={post.id}>
-   <div className="content-heading"><h3>{post.channel==='facebook'?'Facebook Page':'Threads'}</h3><span>{labels[post.status]||post.status}</span></div>
-   <p className="content-muted">{products.find(p=>p.id===post.product_id)?.name||'Sản phẩm'} · Đích: {post.target_id||targets[post.channel]||'chưa cấu hình'}</p>
-   <textarea aria-label={`Nội dung ${post.channel}`} value={post.body} disabled={!!busy||post.status!=='draft'} onChange={e=>{const body=e.target.value;setPosts(old=>old.map(p=>p.id===post.id?{...p,body}:p));setApproved(old=>({...old,[post.id]:false}));}}/>
-   <small>{Array.from(post.body).length} / {post.channel==='threads'?500:5000} ký tự, gồm link và thông báo affiliate.</small>
-   <details><summary>Nhận xét AI về bản gốc</summary><p>{post.review}</p><small>Nhận xét này không cập nhật sau khi bạn sửa nội dung.</small></details>
-   {post.status==='draft'?<><label className="content-approval"><input type="checkbox" checked={!!approved[post.id]} disabled={!!busy} onChange={e=>setApproved(old=>({...old,[post.id]:e.target.checked}))}/> Tôi đã kiểm tra nội dung, link và tài khoản đích; đồng ý đăng công khai bài này.</label><div className="button-row"><button className="btn secondary" disabled={!!busy} onClick={()=>void submit(post,'save')}><Save size={16}/> Lưu chỉnh sửa</button><button className="btn primary" disabled={!!busy||!approved[post.id]||!config[post.channel]} onClick={()=>void submit(post,'publish')}><Send size={16}/>{busy===post.id?'Đang xử lý…':'Duyệt & đăng'}</button></div></>:post.status==='published'?<p>Mã bài: <code>{post.external_id}</code></p>:<p role="status">Kiểm tra bài trực tiếp trên tài khoản đích trước khi xử lý tiếp. Hệ thống khóa gửi lại để tránh trùng bài.</p>}
-  </article>)}</div>
+ function edit(id:string,value:Partial<Post>){setPosts(old=>old.map(p=>p.id===id?{...p,...value}:p));setApproved(old=>({...old,[id]:false}));}
+ async function copy(text:string){try{await navigator.clipboard.writeText(text);setNotice('Đã sao chép nội dung.');}catch{setError('Không sao chép được. Hãy chọn nội dung để sao chép thủ công.');}}
+ const visible=posts.filter(p=>(tab==='all'||p.channel===tab)&&(filter==='all'||(filter==='attention'?['unknown','publishing'].includes(p.status):p.status===filter)));
+ const readyAI=provider==='auto'?config.ai:!!aiInfo.providers[provider];
+ return <section className="social-studio">
+  <div className="studio-intro"><div><span className="studio-eyebrow">CONTENT WORKSPACE</span><h2>Một ý hay. Ba cách kể.</h2><p>Mở đầu khiến người ta dừng lại. Phần còn lại đủ ngắn để đọc hết.</p></div><div className="studio-summary"><strong>{posts.filter(p=>p.status==='draft').length}</strong><span>bài chờ duyệt</span></div></div>
+  <section className="composer-panel" aria-labelledby="composer-title"><div className="composer-title"><span className="step-badge">01</span><div><h3 id="composer-title">Chọn sản phẩm & cách viết</h3><p>Nội dung ngắn mặc định, không cần nhập câu lệnh dài.</p></div></div>
+   <fieldset disabled={!!busy} className="composer-fields"><div className="composer-form-grid"><label className="studio-field product-picker">Sản phẩm<select value={selected} onChange={e=>{setSelected(e.target.value);setImageId('');}}><option value="">Chọn sản phẩm trong danh mục</option>{products.filter(p=>p.status!=='archived').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label className="studio-field">AI viết bài<select value={provider} onChange={e=>chooseAI(e.target.value,'')}><option value="auto">Ưu tiên AI đã cấu hình · không tự đổi khi lỗi</option>{(['gemini','anthropic','openai'] as const).map(p=><option key={p} value={p}>{({gemini:'Google Gemini',anthropic:'Anthropic Claude',openai:'OpenAI'})[p]}{aiInfo.providers[p]?'':' · thiếu khóa'}</option>)}</select></label><label className="studio-field">Model <span className="field-hint">Có thể nhập ID model riêng</span><input disabled={provider==='auto'||!!busy} list="nep-models" value={model} placeholder={aiInfo.defaults[provider]||'Theo cấu hình server'} onChange={e=>chooseAI(provider,e.target.value)}/><datalist id="nep-models">{(aiInfo.suggestions[provider]||[]).map(m=><option key={m} value={m}/>)}</datalist></label><label className="studio-field">Độ dài<select value={length} onChange={e=>setLength(e.target.value as CopyLength)}>{Object.entries(copyLengths).map(([key,value])=><option key={key} value={key}>{value.label}</option>)}</select></label><label className="studio-field">Góc mở đầu<select value={angle} onChange={e=>setAngle(e.target.value)}><option value="problem">Chạm đúng phiền toái</option><option value="curiosity">Gợi tò mò có căn cứ</option><option value="benefit">Đi thẳng vào lợi ích</option></select></label></div>
+   <div className="channel-picker"><span className="field-caption">Tạo bài cho</span><div>{(['facebook','threads','instagram'] as Channel[]).map(channel=>{const Icon=icons[channel];return <label className={`channel-option ${channels.includes(channel)?'chosen':''}`} key={channel}><input type="checkbox" checked={channels.includes(channel)} onChange={e=>setChannels(old=>e.target.checked?[...old,channel]:old.filter(x=>x!==channel))}/><Icon size={17}/>{channelNames[channel]}<span className={config[channel]?'dot connected':'dot'}/></label>;})}</div><small>Chấm xanh: đã điền cấu hình, chưa xác minh quyền đăng. Bạn vẫn có thể tạo bản nháp khi chưa kết nối.</small></div>
+   {product&&<div className="composer-media"><div><strong><ImagePlus size={16}/> Ảnh dùng khi đăng</strong><p>Instagram bắt buộc có ảnh. Facebook và Threads có thể đăng chữ.</p></div><div className="image-choices"><button type="button" className={!imageId?'selected':''} onClick={()=>setImageId('')}>Chỉ chữ</button>{product.product_images.map(img=><button type="button" className={imageId===img.id?'selected':''} key={img.id} aria-label={`Chọn ảnh ${img.original_name}`} aria-pressed={imageId===img.id} onClick={()=>setImageId(img.id)}>{img.url?<img src={img.url} alt={img.original_name}/>:<ImagePlus size={20}/>}</button>)}</div>{!product.product_images.length&&<small>Chưa có ảnh. Thêm ảnh tại Sản phẩm để đăng Instagram.</small>}</div>}
+   {product&&<AIImagePanel product={product} referenceId={imageId} disabled={!!busy||!aiInfo.providers.gemini} onWorking={value=>setBusy(value?'image':'')} onCreated={async id=>{setImageId(id);await onProductsChanged();}}/>}
+   <div className="composer-bottom"><div><span>Hook ngắn · tối đa 3 dòng trước phần link</span><small>Gemini Free tier có hạn mức. Không tự chuyển AI khi lỗi.</small></div><button className="btn primary generate-button" disabled={!selected||!channels.length||!readyAI||!!busy||(channels.includes('instagram')&&!imageId)} onClick={()=>void generate()}><Sparkles size={18}/>{busy==='generate'?'Đang viết…':'Tạo bài ngắn'}<ArrowRight size={16}/></button></div></fieldset>
+  </section>
+  {error&&<div className="studio-alert error" role="alert">{error}</div>}{notice&&<div className="studio-alert success" role="status"><Check size={16}/>{notice}</div>}
+  <section className="draft-workspace"><div className="draft-title"><div><span className="studio-eyebrow">02 · DUYỆT & XUẤT BẢN</span><h2>Nội dung của bạn</h2></div><button className="btn secondary" disabled={!!busy} onClick={()=>{if(posts.some(p=>p.status==='draft')&&!window.confirm('Làm mới tải bản đã lưu. Các chỉnh sửa chưa lưu sẽ mất. Tiếp tục?'))return;void refresh().catch(e=>setError(e.message));}}><RefreshCw size={15}/> Làm mới</button></div>
+   <div className="draft-filters"><div className="platform-tabs" aria-label="Lọc kênh">{(['all','facebook','threads','instagram'] as const).map(channel=><button className={tab===channel?'active':''} key={channel} onClick={()=>setTab(channel)}>{channel==='all'?'Tất cả':channelNames[channel]}</button>)}</div><select aria-label="Lọc trạng thái" value={filter} onChange={e=>setFilter(e.target.value)}><option value="draft">Bản nháp</option><option value="published">Đã đăng</option><option value="attention">Cần xác minh</option><option value="all">Mọi trạng thái</option></select></div>
+   {!visible.length?<div className="studio-empty"><Sparkles size={30}/><h3>{posts.length?'Không có bài trong bộ lọc này.':'Bắt đầu bằng một sản phẩm.'}</h3><p>Chọn sản phẩm ở trên. AI sẽ viết câu mở đầu và lời giới thiệu ngắn cho từng kênh.</p></div>:<div className="social-post-grid">{visible.map(post=>{const Icon=icons[post.channel];const item=products.find(p=>p.id===post.product_id);const image=item?.product_images.find(i=>i.id===post.image_id);const draft=post.status==='draft';const count=Array.from(post.body).length;const limit=post.channel==='threads'?500:post.channel==='instagram'?2200:5000;return <article className="social-post" key={post.id}><header><span className={`platform-avatar ${post.channel}`}><Icon size={20}/></span><div><strong>{channelNames[post.channel]}</strong><span>{item?.name||'Sản phẩm đã xóa'}</span></div><span className={`post-state ${post.status}`}>{statuses[post.status]}</span></header><div className="post-mode"><button className={!preview[post.id]?'active':''} onClick={()=>setPreview(old=>({...old,[post.id]:false}))}>Chỉnh sửa</button><button className={preview[post.id]?'active':''} onClick={()=>setPreview(old=>({...old,[post.id]:true}))}>Xem trước</button><button aria-label="Sao chép bài" onClick={()=>void copy(post.body)}><Copy size={15}/></button></div>
+    {image?.url&&<img className="post-selected-image" src={image.url} alt={item?.name||'Ảnh sản phẩm'}/>}
+    {preview[post.id]?<div className="post-text-preview"><strong>{post.body.split('\n')[0]}</strong><p>{post.body.split('\n').slice(1).join('\n')}</p></div>:<textarea className="post-editor" aria-label={`Bài ${channelNames[post.channel]}`} value={post.body} disabled={!!busy||!draft} onChange={e=>edit(post.id,{body:e.target.value})}/>}
+    <div className={`post-count ${count>limit?'over':''}`}>{count}/{limit} ký tự · đã gồm link affiliate</div>
+    {draft&&<label className="studio-field post-image-field">Ảnh đăng<select disabled={!!busy} value={post.image_id||''} onChange={e=>edit(post.id,{image_id:e.target.value||null})}><option value="">Không đính kèm ảnh</option>{item?.product_images.map((img,index)=><option key={img.id} value={img.id}>Ảnh {index+1} · {img.original_name}</option>)}</select></label>}
+    {post.channel==='instagram'&&<p className="instagram-note">Caption Instagram thường không có link bấm trực tiếp. Bạn cần tự gắn link mua vào bio hoặc Story phù hợp.</p>}
+    <details className="post-review"><summary>Gợi ý rà soát bản AI gốc</summary><p>{post.review}</p><small>Không tự cập nhật khi bạn sửa bài.</small></details><div className="post-target">Đích: <code>{post.target_id||targets[post.channel]||'Chưa cấu hình'}</code>{post.model&&<span>AI: {post.model}</span>}</div>
+    {draft?<><label className="post-approval"><input type="checkbox" disabled={!!busy} checked={!!approved[post.id]} onChange={e=>setApproved(old=>({...old,[post.id]:e.target.checked}))}/><span>Tôi đã kiểm tra nội dung, link, ảnh và tài khoản đích; đồng ý đăng công khai.</span></label><div className="post-actions"><button className="btn secondary" disabled={!!busy} onClick={()=>void submit(post,'save')}><Save size={15}/> Lưu</button><button className="btn primary" disabled={!!busy||!approved[post.id]||!config[post.channel]||count>limit||(post.channel==='instagram'&&!post.image_id)} onClick={()=>void submit(post,'publish')}><Send size={15}/>{busy===post.id?'Đang gửi…':'Đăng bài'}</button></div><button className="rewrite-button" disabled={!!busy||!item||!readyAI} onClick={()=>void generate(post.product_id!,[post.channel],post.image_id||'')}><Sparkles size={13}/> Tạo bản ngắn mới</button></>:post.status==='published'?<p className="published-reference">Đã xuất bản · <code>{post.external_id}</code></p>:<p className="verification-note">Kiểm tra trực tiếp trên Meta trước khi xử lý tiếp. Đã khóa gửi lại để tránh trùng.</p>}
+   </article>;})}</div>}
+  </section>
  </section>;
 }
