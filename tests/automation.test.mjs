@@ -7,7 +7,7 @@ const source=await readFile(new URL('../lib/automation-rules.ts',import.meta.url
 // Compile this pure module with its only dependency inlined for Node's native test runner.
 const rules=await readFile(new URL('../lib/content-rules.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(rules+'\n'+source.replace(/^import[^\n]+\n/,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {automationSettings,pickRandom,postingWindow}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const {automationSettings,pickRandom,postingWindow,productMatches,imageChoices}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 test('automation rejects invalid channels, models, budgets and explicit state; random choice stays in pool',()=>{
  const cfg={enabled:true,channels:['threads'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24};
  assert.equal(automationSettings(cfg).daily_limit,24);
@@ -31,24 +31,24 @@ test('database claim is idempotent, respects off switch and daily cap, and denie
  await db.exec('set role authenticated');await assert.rejects(claim());await assert.rejects(db.query('select * from affiliate_automation_settings'));await db.exec('reset role');
  }finally{await db.close();}
 });
-async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false}={}){
+async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false,cfgOverride={},imagesOverride=[]}={}){
  let generated=0,published=0,paused=false;const logs=[];
- const cfg={enabled:true,channels:['facebook'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24,targets:{facebook:'123'},updated_at:'version1'};
+ const cfg={enabled:true,channels:['facebook'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24,targets:{facebook:'123'},updated_at:'version1',...cfgOverride};
  const db={rpc:async(name)=>({data:name==='eligible_affiliate_products'?['product1']:name==='claim_affiliate_automation'?'job1':null,error:null}),from(table){let action='select',payload,columns='';const chain=new Proxy({},{get(_,prop){if(prop==='then')return resolve=>{
  let data=null;
  if(action==='select'){
  if(table==='affiliate_automation_settings')data=afterGeneration&&generated?{...cfg,enabled:false}:cfg;
  if(table==='affiliate_products')data=[{id:'product1',name:'Daily product',description:'Verified facts',affiliate_url:'https://example.com/link'}];
- if(table==='affiliate_product_images')data=[];
+ if(table==='affiliate_product_images')data=imagesOverride;
  if(table==='affiliate_automation_jobs')data=columns==='id'&&interrupted?[{id:'oldjob'}]:[];
  }else{logs.push({table,payload});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
  return Promise.resolve({data,error:null}).then(resolve);
  };return (...args)=>{if(['select','update'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
- const deps={database:()=>db,env:()=> 'owner1',generateContent:async()=>{generated++;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
+ const deps={database:()=>db,env:()=> 'owner1',generateContent:async()=>{generated++;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
  globalThis.__automationDeps=deps;
  let src=await readFile(new URL('../lib/automation.ts',import.meta.url),'utf8');
  src=src.replace(/^import (?!.*node:crypto).*\n/gm,'');
- src="const {database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,metaRequest,explainError,configuredProviders}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
+ src="const {database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,metaRequest,explainError,configuredProviders}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
  const code=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const worker=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
  return {worker,stats:()=>({generated,published,paused,logs})};
@@ -71,7 +71,7 @@ test('Vietnamese morning/evening boundaries exclude midday, overnight, and end h
  const at=h=>new Date(`2026-10-16T${String(h).padStart(2,'0')}:00:00+07:00`);
  for(const [h,period] of [[0,null],[6,null],[7,'morning'],[11,'morning'],[12,null],[17,null],[18,'evening'],[22,'evening'],[23,null]])assert.equal(postingWindow({},at(h)).period,period);
  assert.equal(postingWindow({},new Date('2026-10-15T23:59:00Z')).local_day,'2026-10-16');
- for(const hours of [{morning_start:12},{morning_end:13},{evening_start:11},{evening_end:25},{morning_start:7.5}])assert.throws(()=>automationSettings({enabled:true,channels:['facebook'],provider:'gemini',copy_length:'tiny',daily_limit:24,...hours}));
+ for(const hours of [{morning_start:12},{morning_end:13},{evening_start:11},{evening_end:25},{morning_start:7.123}])assert.throws(()=>automationSettings({enabled:true,channels:['facebook'],provider:'gemini',copy_length:'tiny',daily_limit:24,...hours}));
 });
 test('database limits a product across channels and cleanup deletes errors without losing posting slots',async()=>{
  const db=new PGlite(),owner='11111111-1111-4111-8111-111111111111',product='22222222-2222-4222-8222-222222222222';
@@ -94,4 +94,26 @@ test('database limits a product across channels and cleanup deletes errors witho
  assert.equal((await reserve(b)).rows[0].ok,false);
  await db.exec(`set role authenticated`);await assert.rejects(db.query('select * from affiliate_automation_errors'));await assert.rejects(db.query(`select reserve_affiliate_product_post('${owner}','${a}')`));
  }finally{await db.close();}
+});
+
+test('selected products/categories and media limits stay within the eligible source',()=>{
+ const defaults={enabled:true,channels:['facebook'],provider:'gemini',copy_length:'tiny',daily_limit:24};
+ const id='11111111-1111-4111-8111-111111111111';
+ const product={id,category:'Custom'};
+ assert.equal(productMatches(product,automationSettings(defaults)),true);
+ assert.equal(productMatches(product,automationSettings({...defaults,selection_mode:'products',selected_products:[id]})),true);
+ assert.equal(productMatches(product,automationSettings({...defaults,selection_mode:'categories',selected_categories:['Other']})),false);
+ for(const update of [{selection_mode:'products'},{selection_mode:'categories'},{max_images:11},{max_images:-1}])assert.throws(()=>automationSettings({...defaults,...update}));
+ assert.deepEqual(imageChoices(['a','b'],5,()=>0),['a','b']);assert.deepEqual(imageChoices(['a','b'],0),[]);
+ assert.equal(postingWindow({morning_start:7.5},new Date('2026-10-16T07:29:00+07:00')).period,null);
+ assert.equal(postingWindow({morning_start:7.5},new Date('2026-10-16T07:30:00+07:00')).period,'morning');
+});
+
+test('no image automatically removes Instagram from the random candidate pool',async()=>{
+ const mixed=await workerFixture({cfgOverride:{channels:['instagram','facebook'],max_images:5}});
+ assert.equal((await mixed.worker.runAutomation()).status,'done');
+ const picked=mixed.stats().logs.find(l=>l.table==='affiliate_automation_jobs'&&l.payload?.channel);
+ assert.equal(picked.payload.channel,'facebook');
+ const igOnly=await workerFixture({cfgOverride:{channels:['instagram'],max_images:0}});assert.equal((await igOnly.worker.runAutomation()).status,'skipped');assert.equal(igOnly.stats().generated,0);assert.equal(igOnly.stats().paused,false);
+ const filtered=await workerFixture({cfgOverride:{selection_mode:'categories',selected_categories:['Not this category']}});assert.equal((await filtered.worker.runAutomation()).status,'skipped');assert.equal(filtered.stats().generated,0);
 });

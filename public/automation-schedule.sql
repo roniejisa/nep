@@ -1,4 +1,4 @@
--- Run automation.sql AND automation-controls.sql first. Create Vault secret nep_cron_secret via Dashboard;
+-- Run automation.sql, automation-controls.sql AND automation-flex.sql first. Create Vault secret nep_cron_secret via Dashboard;
 -- value must equal CRON_SECRET on Vercel (at least 32 random characters).
 -- No credentials should be inserted into this source file.
 create extension if not exists pg_cron;
@@ -9,12 +9,16 @@ do $$ begin
  end if;
 end $$;
 -- Calling schedule with the same name updates that job, instead of duplicating it.
-select cron.schedule('nep-hourly-publish','0 * * * *',$job$
+select cron.schedule('nep-hourly-publish','* * * * *',$job$
  select net.http_post(
   url := 'https://nep-hp.vercel.app/api/automation/cron/',
   headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer '||(select decrypted_secret from vault.decrypted_secrets where name='nep_cron_secret' limit 1)),
   body := '{}'::jsonb,
   timeout_milliseconds := 130000
+ ) where exists (
+ select 1 from public.affiliate_automation_settings s
+ cross join lateral (select public.affiliate_posting_period(now(),s.morning_start,s.morning_end,s.evening_start,s.evening_end) period) w
+ where s.enabled and w.period is not null and mod((extract(hour from now() at time zone 'Asia/Ho_Chi_Minh')*60+extract(minute from now() at time zone 'Asia/Ho_Chi_Minh'))::integer-round((case when w.period='morning' then s.morning_start else s.evening_start end)*60)::integer,60)=0
  );
 $job$);
 -- To remove the scheduler later: select cron.unschedule('nep-hourly-publish');

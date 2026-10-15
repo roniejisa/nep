@@ -1,0 +1,3 @@
+import {authorize,failure,readBody} from '@/lib/content-server';
+export const runtime='nodejs';
+export async function POST(request:Request){try{const {db,user}=await authorize(request);const {postIds}=await readBody(request);if(!Array.isArray(postIds)||!postIds.length||postIds.length>100||postIds.some(id=>typeof id!=='string'||! /^[0-9a-f-]{36}$/i.test(id)))throw new Error('Chọn từ 1 đến 100 bài hợp lệ.');const {data,error}=await db.rpc('delete_affiliate_content',{p_owner:user.id,p_posts:postIds});if(error)throw new Error('Không xóa được. Bài đang gửi hoặc chưa rõ kết quả cần kiểm tra trước; chạy automation-flex.sql nếu chưa có.');return Response.json({removed:data});}catch(e){return failure(e);}}

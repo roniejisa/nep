@@ -1,18 +1,40 @@
-# Nếp 2.5 — lịch sáng/tối, kiểm soát token và nhật ký lỗi 8 giờ
+# Nếp 2.6 — nguồn sản phẩm, danh mục, nhiều ảnh và lịch tùy chỉnh
 
 Trang quản trị sau khi cập nhật: https://nep-hp.vercel.app/automation/
 
-## Nâng cấp từ 2.4
+## Nâng cấp từ 2.5
 
-1. Trong Supabase SQL Editor, chạy `supabase/automation-controls.sql`.
-2. Chạy lại `supabase/automation-schedule.sql` để thêm lịch dọn lỗi mỗi phút. Giữ nguyên CRON_SECRET/Vault đã cài. Script dùng cùng tên job nên không tạo thêm lịch đăng trùng.
-3. Cập nhật source 2.5 lên Vercel, redeploy. Vào `/automation/`, chọn giờ sáng/tối, xác nhận và lưu lại cấu hình. Nếu muốn dừng ngay trước khi nâng cấp, bấm Tắt lịch trên bản cũ.
-4. Kiểm tra Supabase Cron có hai job active: `nep-hourly-publish` và `nep-cleanup-errors`.
+1. Trong Supabase SQL Editor, chạy `supabase/automation-flex.sql`.
+2. Chạy lại `supabase/automation-schedule.sql` để scheduler nhận giờ/phút tùy chỉnh. Giữ nguyên CRON_SECRET/Vault. Dùng cùng tên job nên không tạo trùng lịch đăng.
+3. Cập nhật source 2.6 lên Vercel, redeploy.
+4. Vào `/automation/`: chỉnh giờ/phút, chọn toàn bộ kho hoặc sản phẩm/danh mục cụ thể, đặt số ảnh tối đa, xác nhận và lưu lại.
+
+Nếu đang ở bản 2.4: chạy `automation-controls.sql` trước `automation-flex.sql`. Nếu chưa cài tự động hóa: làm phần cài mới. Các migration không xóa sản phẩm/ảnh/bài hiện có.
+
+## Sản phẩm và danh mục
+
+- Mở `/categories/` hoặc nút Tạo & quản lý danh mục trong kho sản phẩm. Có thể tạo nhóm rỗng trước khi thêm hàng.
+- Đổi tên danh mục cập nhật sản phẩm và bộ lọc lịch tương ứng; đổi sang một tên đã có sẽ gộp nhóm.
+- Xóa nhóm chuyển sản phẩm sang Khác và tạm dừng lịch đang lọc nhóm đó. Không tự mở rộng bộ lọc sang toàn bộ nhóm Khác.
+- Danh mục Khác là nhóm dự phòng, không xóa/đổi tên. Form sản phẩm cũng cho nhập tên nhóm mới.
+- Ba cách chọn nguồn tự động: ngẫu nhiên toàn bộ kho; ngẫu nhiên trong các sản phẩm được đánh dấu; ngẫu nhiên trong các danh mục được đánh dấu. Mỗi giờ vẫn tối đa một sản phẩm/kênh. Chỉ sản phẩm Sẵn sàng, nguồn đã kiểm tra, còn lượt đăng mới được dùng.
+- Có thể chọn tối đa 1.000 sản phẩm hoặc 200 danh mục cho một cấu hình; dữ liệu kho đọc tối đa 1.000 sản phẩm. Chọn nhiều mục không đảm bảo mọi mục sẽ được đăng trong ngày vì còn số giờ và hạn mức.
+
+## Chọn ảnh và xóa bài AI
+
+- Chọn tối đa 0–10 ảnh cho tự động. 0 = chỉ chữ. Lấy ngẫu nhiên không trùng từ ảnh của đúng sản phẩm; có 2 ảnh mà đặt 5 thì chỉ dùng 2.
+- Instagram tự loại khỏi tập kênh ứng viên nếu sản phẩm không có ảnh hoặc cấu hình đặt 0 ảnh. Facebook/Threads còn được chọn nếu đã bật. Nếu chỉ bật Instagram và không còn sản phẩm có ảnh, bỏ qua lượt, không gọi AI và không làm tắt lịch.
+- Không lấy ảnh từ sản phẩm khác. Ảnh đã bị xóa hoặc không còn thuộc sản phẩm sẽ chặn gửi thay vì dùng nhầm ảnh.
+- Facebook đăng nhiều ảnh trong một bài feed; Instagram/Threads đăng carousel khi có từ 2 ảnh, dùng một ảnh khi chỉ có 1. Ứng dụng giới hạn chung 10 ảnh. Mỗi carousel tính một lượt sản phẩm.
+- Lưu trữ vẫn chỉ WebP; Meta tải JPEG tạm qua endpoint ảnh. Không tạo bản JPEG thứ hai trong Storage.
+- Mục nội dung thủ công có thể chọn nhiều ảnh, xem ảnh và đổi bộ ảnh cho từng bản nháp.
+- Nút Xóa bản nháp xóa vĩnh viễn bản nháp khỏi database. Có nút xóa hàng loạt bản nháp đang được tải của kênh đã chọn (lịch sử tải tối đa 50 bài/lần). Các bài đang gửi/chưa rõ kết quả được bảo vệ, phải kiểm tra Meta trước.
+- Với bài đã đăng, Gỡ khỏi thư viện ẩn bản ghi khỏi giao diện quản trị. Không gọi API xóa bài trên Meta và không xóa bằng chứng dùng để chặn đăng lặp. Muốn xóa nội dung công khai, thao tác trên nền tảng.
 
 ## Cài mới
 
 1. Cần có các migration dữ liệu/nội dung của bản 2.3: `content.sql`, `social-v2.sql`, cùng các bảng OAuth bạn dùng. Không xóa bảng cũ.
-2. Chạy lần lượt `supabase/automation.sql`, `supabase/automation-controls.sql`.
+2. Chạy lần lượt `supabase/automation.sql`, `supabase/automation-controls.sql`, `supabase/automation-flex.sql`.
 3. Tạo chuỗi ngẫu nhiên ít nhất 32 ký tự bằng trình quản lý mật khẩu, hoặc Node: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 4. Vercel → Settings → Environment Variables: đặt `CRON_SECRET` bằng chuỗi trên, phạm vi Production, rồi redeploy. Không dùng tiền tố NEXT_PUBLIC_.
 5. Supabase Vault: tạo secret tên `nep_cron_secret`, giá trị giống CRON_SECRET. Nếu đã có, sửa secret hiện tại, không tạo nhiều secret trùng tên. Không gửi secret trong chat hoặc commit vào Git.
@@ -22,7 +44,7 @@ Trang quản trị sau khi cập nhật: https://nep-hp.vercel.app/automation/
 
 ## Giới hạn đăng sản phẩm
 
-- Theo giờ Việt Nam, mặc định sáng 07:00–trước 12:00, tối 18:00–trước 23:00. Có thể đổi trong quản trị. Khung sáng nằm trong 00–12, khung tối trong 12–24; không chồng nhau.
+- Theo giờ Việt Nam, mặc định sáng 07:00–trước 12:00, tối 18:00–trước 23:00. Có thể đổi cả giờ và phút trong quản trị. Ví dụ bắt đầu 07:30 thì các lượt sáng đến vào 07:30, 08:30… đến trước giờ kết thúc. Cuối khung tối 00:00 nghĩa là hết ngày (24:00). Khung sáng nằm trong 00–12, khung tối trong 12–24; không chồng nhau.
 - Mỗi sản phẩm tối đa **1 lần sáng + 1 lần tối mỗi ngày**, tính chung mọi kênh, cả đăng thủ công qua Nếp. Bài đã đăng bên ngoài Nếp không tự đồng bộ về để đếm.
 - Ví dụ: sản phẩm A đã đăng Facebook lúc 08:00 thì không được đăng Threads lúc 09:00. Đến khung tối mới có lượt tiếp theo.
 - Mỗi giờ chỉ chọn ngẫu nhiên 1 sản phẩm/kênh/ảnh/góc viết còn lượt. Ngoài khung giờ hoặc hết sản phẩm đủ điều kiện: bỏ qua, không gọi AI, không đăng bù.
@@ -53,7 +75,7 @@ Trang quản trị sau khi cập nhật: https://nep-hp.vercel.app/automation/
 
 ## Vận hành và kiểm tra
 
-Supabase Cron gọi POST `https://nep-hp.vercel.app/api/automation/cron/` lúc phút 00 mỗi giờ. Nếu đổi tên miền, sửa URL trong SQL rồi chạy lại. Không cần giữ trình duyệt mở.
+Supabase Cron kiểm tra cấu hình mỗi phút, chỉ gọi POST `https://nep-hp.vercel.app/api/automation/cron/` trong khung đang bật và đúng phút bắt đầu của khung đó mỗi giờ. Phút gọi HTTP thực tế phụ thuộc độ sẵn sàng Cron, database và website. Nếu đổi tên miền, sửa URL trong SQL rồi chạy lại. Không cần giữ trình duyệt mở.
 
 - Cùng một giờ tối đa một lượt; tổng AI thủ công và tự động tối đa 30 lượt/24 giờ. Hạn mức tự động 1–24 lượt/ngày tính theo giờ Việt Nam.
 - Một nhà cung cấp mỗi lượt, không tự chuyển sang nhà cung cấp trả phí khác. Chi phí/hạn mức phụ thuộc tài khoản và model; Gemini không mặc nhiên miễn phí.

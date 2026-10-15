@@ -384,3 +384,8 @@ Giá và hạn mức: https://ai.google.dev/gemini-api/docs/pricing
 ## Tự động đăng mỗi giờ (2.4)
 
 Xem `HUONG-DAN-TU-DONG.md`. Chạy `automation.sql`, đặt CRON_SECRET/Vault, chạy `automation-schedule.sql`, rồi bật và lưu tại `/automation/`. Không tự bật trước khi bạn cấu hình.
+
+
+## Nâng cấp 2.6
+
+Từ 2.5: chạy `supabase/automation-flex.sql`, chạy lại `supabase/automation-schedule.sql`, cập nhật source và redeploy. Cấu hình tại `/automation/`, quản lý danh mục tại `/categories/`. Xem `HUONG-DAN-TU-DONG.md`.
