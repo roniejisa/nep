@@ -1,14 +1,6 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import { CONTACT_EMAIL,POLICY_DATE } from '@/lib/site-info';
-export const metadata:Metadata={title:'Điều khoản dịch vụ | Nếp',description:'Điều kiện sử dụng công cụ quản trị affiliate và xuất bản nội dung của Nếp.'};
-export default function Terms(){return <><p className="public-kicker">Nếp · Terms of service</p><h1>Điều khoản dịch vụ</h1><p className="public-date">Cập nhật: {POLICY_DATE}</p>
- <p>Khi sử dụng Nếp, bạn đồng ý sử dụng công cụ trong phạm vi các điều khoản này và <Link href="/privacy-policy/">Chính sách quyền riêng tư</Link>. Nếu không đồng ý, bạn có thể ngừng sử dụng và yêu cầu xóa dữ liệu.</p>
- <h2>1. Phạm vi dịch vụ</h2><p>Nếp hỗ trợ lưu sản phẩm, tối ưu ảnh, tạo bản nháp với AI và đăng văn bản kèm link lên tài khoản Facebook Page hoặc Threads được cấu hình. Tính năng phụ thuộc quyền truy cập, cấu hình và khả năng hoạt động của dịch vụ bên thứ ba.</p>
- <h2>2. Tài khoản và quyền sử dụng</h2><p>Bạn phải có quyền sử dụng dữ liệu, hình ảnh, liên kết và tài khoản mạng xã hội cung cấp cho ứng dụng. Hãy giữ bí mật thông tin đăng nhập và khóa truy cập, không chia sẻ tài khoản trái phép và thông báo cho quản trị viên nếu phát hiện truy cập bất thường.</p>
- <h2>3. Nội dung và trách nhiệm duyệt bài</h2><p>Bạn chịu trách nhiệm kiểm tra tính chính xác, quyền sở hữu trí tuệ và tính phù hợp của nội dung trước khi xuất bản. Không sử dụng Nếp để spam, lừa đảo, giả mạo trải nghiệm, tạo khuyến mãi không có thật hoặc công bố thông tin cá nhân trái phép. Việc quảng bá sản phẩm và sử dụng link affiliate phải phù hợp với quy định áp dụng và chính sách của nền tảng liên quan.</p><p>AI có thể viết sai hoặc suy diễn. Nhận xét của AI không phải chứng nhận về chất lượng, hiệu quả sản phẩm hoặc khả năng tuân thủ. Nếp không bảo đảm số lượt xem, tương tác, đơn hàng hoặc hoa hồng.</p>
- <h2>4. Đăng lên nền tảng bên ngoài</h2><p>Nút “Duyệt & đăng” gửi nội dung đã xác nhận đến tài khoản đích và có thể làm bài xuất hiện công khai ngay. Kiểm tra nội dung và ID tài khoản đích trước khi nhấn. Khi phản hồi không xác định, hãy kiểm tra bài trên nền tảng trước khi thử lại. Xóa dữ liệu trong Nếp không tự động gỡ bài Facebook hoặc Threads.</p>
- <h2>5. Quyền đối với nội dung</h2><p>Bạn giữ các quyền hợp pháp đối với dữ liệu do mình cung cấp. Bạn cho phép Nếp và các nhà cung cấp kỹ thuật cần thiết xử lý dữ liệu đó để thực hiện chức năng bạn yêu cầu. Không sử dụng tên, hình ảnh, nhãn hiệu hoặc nội dung của bên khác khi chưa có quyền phù hợp.</p>
- <h2>6. Chi phí và khả năng hoạt động</h2><p>API AI, hạ tầng lưu trữ và hosting có thể phát sinh phí theo tài khoản của bạn với từng nhà cung cấp. Các giới hạn trong ứng dụng không thay thế hạn mức ngân sách tại nhà cung cấp. Dịch vụ có thể bị gián đoạn, thay đổi hoặc bị giới hạn bởi lỗi mạng, token hết hạn hay thay đổi từ nền tảng.</p>
- <h2>7. Ngừng sử dụng và hỗ trợ</h2><p>Bạn có thể ngừng sử dụng, thu hồi quyền kết nối và yêu cầu xóa dữ liệu theo <Link href="/data-deletion/">hướng dẫn riêng</Link>. Quản trị viên có thể giới hạn quyền sử dụng khi phát hiện lạm dụng hoặc nguy cơ truy cập trái phép. Những điều khoản này không loại trừ quyền mà bạn được hưởng theo quy định pháp luật áp dụng.</p>
- <h2>8. Liên hệ và thay đổi</h2><p>Câu hỏi về dịch vụ gửi đến <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Điều khoản có thể được cập nhật để phản ánh thay đổi của ứng dụng; ngày cập nhật được ghi ở đầu trang.</p></>}
+import PublicPolicy from '@/components/public-policy';
+import {getSiteSettings} from '@/lib/site-settings-server';
+import {interpolate} from '@/lib/site-settings';
+export const dynamic='force-dynamic';
+export async function generateMetadata(){const {settings}=await getSiteSettings();return {title:interpolate(settings.pages['terms-of-service'].title,settings)+' | '+settings.name};}
+export default function Page(){return <PublicPolicy page="terms-of-service"/>;}

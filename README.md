@@ -1,6 +1,6 @@
 # Nếp — Quản trị Shopee Affiliate
 
-**Bản 1.1 cho Vercel: đọc DEPLOY-VERCEL.md để bật Nội dung AI và đăng Meta.**
+**Bản 1.2 cho Vercel: đọc DEPLOY-VERCEL.md để bật Nội dung AI và đăng Meta.**
 
 Ứng dụng Next.js App Router + Supabase, giao diện tiếng Việt, responsive. Dùng Next.js server trên Vercel; dữ liệu được đọc/ghi trực tiếp qua Supabase SDK và được bảo vệ bằng Auth + RLS.
 

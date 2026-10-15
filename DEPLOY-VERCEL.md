@@ -65,7 +65,7 @@ Các route riêng, không yêu cầu đăng nhập ứng dụng:
 - `/data-deletion/`: hướng dẫn yêu cầu xóa dữ liệu qua email, KHÔNG phải endpoint callback.
 - `/contact/`: liên hệ quản trị viên.
 
-Email liên hệ lấy từ ảnh cấu hình Meta: roniejisa@gmail.com. Cấu hình nằm trong lib/site-info.ts. Chủ ứng dụng cần kiểm tra email này hoạt động và thực hiện các yêu cầu dữ liệu được gửi đến. Bản này không có hệ thống gửi email/ticket tự động.
+Email liên hệ lấy từ ảnh cấu hình Meta: roniejisa@gmail.com. Từ bản 1.2, chỉnh email tại Thiết lập → Thông tin & nội dung website; mặc định nằm trong lib/site-defaults.json. Chủ ứng dụng cần kiểm tra email này hoạt động và thực hiện các yêu cầu dữ liệu được gửi đến. Bản này không có hệ thống gửi email/ticket tự động.
 
 Sau redeploy, mở Thiết lập > Đường dẫn cho Meta tại tên miền Production để sao chép URL đầy đủ. Đừng dùng URL Preview hoặc tên miền được bảo vệ bằng đăng nhập Vercel. Kiểm tra từng trang bằng cửa sổ ẩn danh; trang phải tải được công khai và không trả lỗi 404.
 
@@ -79,3 +79,29 @@ Các trang được tạo theo tính năng hiện tại, không phải chứng n
 
 ### Quy trình quản trị khi nhận yêu cầu xóa
 Xác minh quyền sở hữu trước khi xử lý. Xác nhận phạm vi và thời gian dự kiến với người gửi. Nếu xóa toàn bộ, kiểm tra các object Storage của user trước khi xóa tài khoản, dọn ảnh và dữ liệu liên quan (sản phẩm/ảnh, nội dung, lượt AI), sau đó xóa tài khoản Auth nếu nằm trong phạm vi yêu cầu. Không chỉ xóa sản phẩm vì lịch sử nội dung có thể vẫn tồn tại. Kiểm tra lỗi và phần dữ liệu còn lại; gỡ token server tương ứng và thu hồi quyền Meta nếu cần. Thông báo kết quả và các giới hạn lưu giữ thực tế, không hứa xóa bản sao lưu chưa kiểm chứng. Bài đã đăng cần được xử lý riêng trên Meta. Không thực hiện xóa chỉ vì người gửi biết email/ID của tài khoản.
+
+## Bản 1.2 — chỉnh thông tin và hướng dẫn khóa trong quản trị
+
+1. Cập nhật source và chạy thêm `supabase/site-settings.sql`.
+2. Cấu hình `SUPABASE_SERVICE_ROLE_KEY` và `CONTENT_ADMIN_USER_ID` trên Vercel, redeploy. UUID quản trị được hiển thị trong Thiết lập khi bạn đăng nhập.
+3. Vào Thiết lập → Thông tin & nội dung website. Có thể sửa tên, khẩu hiệu, mô tả SEO, email liên hệ, ngày chính sách, chân trang, tiêu đề/mô tả 4 màn hình và tiêu đề/nội dung 4 trang công khai. Bấm Lưu; tải lại trang công khai để xem nội dung mới. Không cần redeploy cho các nội dung này.
+4. Mục Kết nối AI, Facebook & Threads chỉ dẫn nơi lấy và điền từng biến. Bấm kiểm tra để xem biến nào còn thiếu. Kiểm tra này không gọi AI/Meta, không đăng bài và không xác nhận hiệu lực token.
+
+Thông tin công khai được lưu riêng trong affiliate_site_settings, cho phép khách đọc nhưng chỉ server quản trị ghi. Khóa/token vẫn đặt tại Vercel Environment Variables; không có chức năng lưu khóa bí mật vào bảng công khai. Những ô văn bản của trang chính sách hỗ trợ tiêu đề bằng `## `, dòng văn bản và placeholder `{siteName}`, `{contactEmail}`; không hỗ trợ HTML/JS. Các đường dẫn được giữ ổn định để tránh hỏng liên kết đã nộp Meta.
+
+Phạm vi trình chỉnh sửa: thông tin thương hiệu, nội dung giới thiệu và các trang công khai nêu trên. Nhãn thao tác, bố cục, màu sắc, chức năng và các quy tắc kỹ thuật vẫn nằm trong source, chưa phải trình kéo-thả sửa toàn bộ giao diện. Dữ liệu sản phẩm/ảnh tiếp tục chỉnh trong danh mục như trước.
+
+Nếu chưa có bảng hoặc Supabase tạm không đọc được cấu hình, trang công khai dùng nội dung mặc định để không trắng trang; giao diện chỉnh sửa thông báo đang dùng mặc định. Tên/email mặc định nằm trong lib/site-defaults.json. Việc lưu cần quyền quản trị server hợp lệ.
+
+### Điền khóa theo thứ tự dễ kiểm tra
+- Bước A: hai biến Supabase/admin ở trên.
+- Bước B: OPENAI_API_KEY và OPENAI_MODEL=gpt-4.1-mini; redeploy rồi thử Tạo nội dung AI với một sản phẩm có mô tả.
+- Bước C: FACEBOOK_PAGE_ID, FACEBOOK_PAGE_ACCESS_TOKEN và META_GRAPH_VERSION; token phải của Page, không phải App Secret.
+- Bước D: THREADS_USER_ID và THREADS_ACCESS_TOKEN; ID/token phải của tài khoản Threads, không phải app.
+- Mỗi lần đổi biến môi trường, redeploy. Chọn Production cho website chính; không cần đưa khóa production sang Preview nếu không dùng Preview để thử tích hợp.
+
+Tài liệu: https://vercel.com/docs/environment-variables/managing-environment-variables
+Lấy khóa AI: https://platform.openai.com/api-keys
+Khởi đầu OpenAI: https://developers.openai.com/api/docs/quickstart
+Token Page: https://www.postman.com/meta/facebook/request/bqfxwbp/get-access-tokens-of-pages-you-manage
+Token Threads: https://developers.facebook.com/documentation/threads/get-started/get-access-tokens-and-permissions
