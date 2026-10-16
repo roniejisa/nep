@@ -1,3 +1,11 @@
+# Nếp 2.9.1 — sửa lỗi cron gọi AI và tạm dừng
+
+Đọc **CRON-AI-FIX-2.9.1.md**. Chỉ viết kênh cần đăng, chờ AI tối đa 60 giây, sửa đúng bản dài một lần, retry lỗi tạm thời có backoff/Retry-After. 503/timeout/chưa đạt nội dung bỏ qua lượt và giữ lịch cho giờ kế tiếp; sai khóa/model hoặc Meta chưa rõ kết quả vẫn dừng. Nếu đã cài đầy đủ 2.9 thì không cần SQL mới hoặc cài lại cron. Lịch tắt do lỗi cũ cần bật/lưu lại một lần sau deploy.
+
+# Nếp 2.9 — thêm Reel và video sản phẩm
+
+Đọc **REELS-2.9.md** để nâng cấp: chạy `supabase/reels.sql` sau `automation-unrestricted.sql`, rồi deploy source mới. Bản này thêm video riêng tư theo sản phẩm, viết mô tả và đăng Reel Facebook/Instagram; lịch chọn Bài thường/Reel/Trộn và định dạng riêng theo giờ. Giữ link affiliate trong mô tả, **không tự gắn thẻ giỏ hàng Shopee**. Threads vẫn dùng bài thường. Lịch cũ được giữ dạng bài thường.
+
 # Nếp 2.8 — tự viết, tự đăng theo lịch, không giới hạn sáng/tối
 
 Bản 2.8 thay thế các giới hạn được mô tả trong ghi chú phiên bản cũ phía dưới. Đọc **HUONG-DAN-TU-DONG.md** để nâng cấp: chạy `supabase/automation-unrestricted.sql`, rồi chạy lại `supabase/automation-schedule.sql`, và deploy source mới. Giữ nguyên khóa và dữ liệu.

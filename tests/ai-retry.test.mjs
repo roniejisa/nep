@@ -23,12 +23,12 @@ test('AI retries only the selected Gemini model, waits 10s and stops at first su
  }finally{globalThis.fetch=original;if(key===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=key;}
 });
 
-test('persistent AI errors make at most five calls and four delays without leaking provider bodies',async()=>{
+test('permanent AI authentication errors stop after one call without leaking provider bodies',async()=>{
  const original=globalThis.fetch,key=process.env.GEMINI_API_KEY;process.env.GEMINI_API_KEY='test-key';let calls=0;const delays=[],events=[];
  try{
   globalThis.fetch=async()=>{calls++;return Response.json({error:'secret-response-body'},{status:401});};
-  await assert.rejects(generateCopy('i','p',{provider:'gemini'},{maxAttempts:5,pause:async ms=>delays.push(ms),onFailure:async(e,n,retry)=>events.push({n,retry,message:e.message})}),e=>e.message.includes('5/5')&&e.message.includes('HTTP 401')&&!e.message.includes('secret-response-body'));
-  assert.equal(calls,5);assert.deepEqual(delays,[10000,10000,10000,10000]);assert.equal(events.at(-1).retry,false);
+  await assert.rejects(generateCopy('i','p',{provider:'gemini'},{maxAttempts:5,pause:async ms=>delays.push(ms),onFailure:async(e,n,retry)=>events.push({n,retry,message:e.message})}),e=>e.message.includes('1/5')&&e.message.includes('HTTP 401')&&!e.message.includes('secret-response-body'));
+  assert.equal(calls,1);assert.deepEqual(delays,[]);assert.equal(events.at(-1).retry,false);
  }finally{globalThis.fetch=original;if(key===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=key;}
 });
 
@@ -40,7 +40,7 @@ test('invalid generated copy is retried before saving; manual calls still defaul
   assert.equal(result.attempts,2);assert.equal(calls,2);assert.equal(result.output.facebook,output.facebook);
   calls=0;globalThis.fetch=async()=>{calls++;throw new DOMException('timeout','TimeoutError');};
   await assert.rejects(generateCopy('i','p',{provider:'gemini'}));assert.equal(calls,1);
-  calls=0;await assert.rejects(generateCopy('i','p',{provider:'gemini'},{maxAttempts:5,deadline:Date.now()+5000,pause:async()=>assert.fail('Not enough time to wait')}));assert.equal(calls,1);
+  calls=0;await assert.rejects(generateCopy('i','p',{provider:'gemini'},{maxAttempts:5,deadline:Date.now()+5000,pause:async()=>assert.fail('Not enough time to wait')}));assert.equal(calls,0);
  }finally{globalThis.fetch=original;if(key===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=key;}
 });
 

@@ -18,7 +18,7 @@ try{
   assert.ok(!html.includes('class="app-shell"'),path+' does not render the workspace');
   const reload=await originalFetch(`${base}/${path}/`);assert.equal(reload.status,200,path+' reload');await reload.arrayBuffer();
  }
- for(const path of ['admin/access','admin/initial-links','categories','automation','content/status','integrations/status']) {
+ for(const path of ['admin/access','admin/initial-links','categories','automation','content/status','integrations/status','product-videos']) {
   const response=await originalFetch(`${base}/api/${path}/`);
   assert.ok(response.status>=400,path+' denies anonymous access');
   const result=await response.json();assert.ok(result.error,path+' returns an error');
@@ -26,7 +26,8 @@ try{
  }
  const denied=await originalFetch(`${base}/api/admin/access/`,{headers:{Authorization:'Bearer invalid-test-token'}});
  assert.equal(denied.status,403);assert.equal(denied.headers.get('cache-control'),'private, no-store');
- console.log('PASS: redirects; 6 anonymous routes and reloads show only the access gate; 6 private APIs deny anonymous access; invalid token denied.');
+ for(const method of ['POST','DELETE']){const response=await originalFetch(`${base}/api/product-videos/`,{method,headers:{'Content-Type':'application/json'},body:'{}'});assert.ok(response.status>=400,'anonymous video mutation denied');}
+ console.log('PASS: redirects; 6 anonymous routes and reloads show only the access gate; 7 private APIs deny anonymous access; video writes denied; invalid token denied.');
 }finally{
  if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await app.close();globalThis.fetch=originalFetch;
 }

@@ -38,7 +38,7 @@ test('upgrade removes product/day caps for all channels while preserving slot cl
 
 test('five AI attempts share one run lock and save one draft, without a 30/day counter',async()=>{
  let source=await readFile(new URL('../lib/content-generate.ts',import.meta.url),'utf8');
- for(const name of ['post-images','ai-provider','content-rules'])source=source.replaceAll(`@/lib/${name}`,new URL(`../lib/${name}.ts`,import.meta.url).href);
+ for(const name of ['post-images','ai-provider','content-rules','reel-rules','operation-error'])source=source.replaceAll(`@/lib/${name}`,new URL(`../lib/${name}.ts`,import.meta.url).href);
  const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const {generateContent}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
  const original=globalThis.fetch,key=process.env.GEMINI_API_KEY;process.env.GEMINI_API_KEY='test-key';

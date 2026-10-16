@@ -1,4 +1,5 @@
 import {selectedChannels,contentBrief} from './content-rules';
+import {reelSettings} from './reel-rules';
 export function automationSettings(value:Record<string,unknown>){
  if(typeof value.enabled!=='boolean')throw new Error('Trạng thái lịch không hợp lệ.');
  const channels=selectedChannels(value.channels);
@@ -9,7 +10,9 @@ export function automationSettings(value:Record<string,unknown>){
  const {morning_start,morning_end,evening_start,evening_end}=postingWindow(value);
  const schedule_mode=value.schedule_mode==='times'?'times':'windows';if(value.schedule_mode&& !['times','windows'].includes(String(value.schedule_mode)))throw new Error('Chế độ lịch không hợp lệ.');
  const schedule_times=schedule_mode==='times'?scheduleTimes(value.schedule_times):[];
- return {schedule_mode,schedule_times,...selectionSettings(value),morning_start,morning_end,evening_start,evening_end,enabled:value.enabled,channels,provider:String(value.provider),model,copy_length:String(value.copy_length),daily_limit:24};
+ const formats=reelSettings({...value,schedule_times});
+ if((formats.format_mode==='reel'||Object.values(formats.slot_formats).includes('reel'))&&channels.every(c=>c==='threads'))throw new Error('Reel cần Facebook hoặc Instagram; Threads không hỗ trợ Reel.');
+ return {...formats,schedule_mode,schedule_times,...selectionSettings(value),morning_start,morning_end,evening_start,evening_end,enabled:value.enabled,channels,provider:String(value.provider),model,copy_length:String(value.copy_length),daily_limit:24};
 }
 export function pickRandom<T>(values:T[],random:()=>number=Math.random):T{if(!values.length)throw new Error('Không có lựa chọn phù hợp.');return values[Math.min(values.length-1,Math.floor(random()*values.length))];}
 

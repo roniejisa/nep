@@ -1,3 +1,11 @@
+# Nếp 2.9.1 — sửa lỗi cron gọi AI và tạm dừng
+
+Đọc **CRON-AI-FIX-2.9.1.md**. Chỉ viết kênh cần đăng, chờ AI tối đa 60 giây, sửa đúng bản dài một lần, retry lỗi tạm thời có backoff/Retry-After. 503/timeout/chưa đạt nội dung bỏ qua lượt và giữ lịch cho giờ kế tiếp; sai khóa/model hoặc Meta chưa rõ kết quả vẫn dừng. Nếu đã cài đầy đủ 2.9 thì không cần SQL mới hoặc cài lại cron. Lịch tắt do lỗi cũ cần bật/lưu lại một lần sau deploy.
+
+# Nếp 2.9 — thêm Reel và video sản phẩm
+
+Đọc **REELS-2.9.md** để nâng cấp: chạy `supabase/reels.sql` sau `automation-unrestricted.sql`, rồi deploy source mới. Bản này thêm video riêng tư theo sản phẩm, viết mô tả và đăng Reel Facebook/Instagram; lịch chọn Bài thường/Reel/Trộn và định dạng riêng theo giờ. Giữ link affiliate trong mô tả, **không tự gắn thẻ giỏ hàng Shopee**. Threads vẫn dùng bài thường. Lịch cũ được giữ dạng bài thường.
+
 # Nếp 2.8 — Tự viết, tự đăng theo giờ đã chọn
 
 ## Nâng cấp bản hiện tại
@@ -26,10 +34,10 @@ Cron kiểm tra mỗi phút, chỉ nhận mốc vừa đến trong cửa sổ 5 
 
 - Tự động mặc định: **Gemini `gemini-3.5-flash-lite`**, **Siêu ngắn**, chạm đúng **một phiền toái cụ thể trong sinh hoạt** ngay câu mở đầu. Không mở đầu chung chung, không bịa trải nghiệm, công dụng, giá hoặc giảm giá. Vẫn có thể đổi provider/model/độ dài trong nhóm AI viết bài.
 - Phần AI viết tối đa 150 ký tự Facebook, 120 Threads, 180 Instagram; câu đầu tối đa 70 ký tự, không quá 3 dòng. Hệ thống tự thêm thông báo affiliate và link gốc rồi kiểm tra bài cuối theo kênh.
-- AI lỗi HTTP/mạng/JSON hoặc bài không đạt kiểm tra: tối đa **5 lần gọi tổng cộng** (lần đầu + tối đa 4 lần thử lại), chờ khoảng 10 giây sau lần lỗi. Dừng ngay khi thành công. Mỗi yêu cầu AI chờ tối đa 30 giây.
+- AI lỗi HTTP/mạng/JSON hoặc bài không đạt kiểm tra: tối đa **5 lần gọi tổng cộng** (lần đầu + tối đa 4 lần thử lại), chờ tăng dần 10–60 giây với lỗi tạm thời, tôn trọng Retry-After. Mỗi yêu cầu AI chờ tối đa 60 giây và dừng ngay khi thành công. Bài dài chỉ sửa một lần.
 - Giữ nguyên provider/model ở mọi lần thử. Một chuỗi thử lại giữ một khóa AI; chỉ lưu một bộ bản nháp sau khi thành công. Không gọi lại AI để thử sửa lỗi lưu database.
 - Có ngân sách thời gian tổng cho cron 300 giây, kiểm tra trước lần thử tiếp theo và trước khi đăng. Nếu không đủ thời gian, có thể dừng sớm hơn 5 lần. Không thử vô hạn.
-- Nhật ký ghi từng lần AI lỗi, thời điểm và thông báo chờ thử lại; thành công ghi số lần gọi AI. Nếu vẫn lỗi sau các lần thử, lịch tạm dừng để xử lý. Các lần lỗi có thể vẫn tiêu thụ token/quota Google; nếu không biết tổng token thì không hiển thị con số đoán.
+- Nhật ký ghi từng lần AI lỗi, thời điểm và thông báo chờ thử lại; thành công ghi số lần gọi AI. Lỗi AI tạm thời/chưa đạt nội dung bỏ qua lượt, giữ lịch cho giờ kế tiếp; sai khóa/model mới làm lịch dừng. Các lần lỗi có thể vẫn tiêu thụ token/quota Google; nếu không biết tổng token thì không hiển thị con số đoán.
 - Cơ chế 5 lần áp dụng cron viết bài. Nút tạo bài thủ công và tạo ảnh AI vẫn là một yêu cầu mỗi lần bấm.
 
 Giữ `GEMINI_API_KEY` trên server Vercel. Đặt `GEMINI_MODEL=gemini-3.5-flash-lite` nếu muốn đồng nhất lựa chọn mặc định thủ công; model điền rõ trong lịch được ưu tiên. Free tier/chi phí phụ thuộc tài khoản Google, không có cam kết miễn phí vô hạn.

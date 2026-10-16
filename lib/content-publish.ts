@@ -1,4 +1,6 @@
 import {assertPublishingQuota} from '@/lib/publishing-quota';
+import {postFormat,VIDEO_BUCKET,videoMetadata} from '@/lib/reel-rules';
+import {publishReel} from '@/lib/reel-publish';
 import {postImages} from '@/lib/post-images';
 import {socialTarget} from '@/lib/social-connections';
 import {instagramTarget} from '@/lib/instagram-connection';
@@ -14,17 +16,28 @@ const {postId,body,approved,action,imageId,expectedTargetId}=input;
   const {data:post,error}=await db.from('affiliate_content_posts').select('*').eq('id',postId).eq('owner_id',ownerId).single();
   if(error||!post||!isChannel(post.channel))throw new Error('Không tìm thấy bản nháp hợp lệ.');
   if(post.status!=='draft')throw new Error('Bài đã gửi hoặc cần xác minh. Không gửi lại để tránh trùng.');
+  const format=postFormat(post.post_format);
+  if(format==='reel'&&post.channel==='threads')throw new Error('Threads không hỗ trợ Reel.');
   validatePost(post.channel,body);
   const {data:product}=await db.from('affiliate_products').select('affiliate_url').eq('id',post.product_id).eq('owner_id',ownerId).single();
   if(!product||!body.includes(product.affiliate_url)||!hasDisclosure(body))throw new Error('Giữ link affiliate gốc và thông báo hoa hồng trong bài.');
-  const selectedImages=postImages(input.imageIds??(imageId===undefined?post.image_ids:undefined),imageId===undefined?post.image_id:imageId);
+  const selectedImages=format==='reel'?[]:postImages(input.imageIds??(imageId===undefined?post.image_ids:undefined),imageId===undefined?post.image_id:imageId);
   const selectedImage=selectedImages[0]||null;
   if(selectedImages.length){const {data:images,error:imgError}=await db.from('affiliate_product_images').select('id').in('id',selectedImages).eq('product_id',post.product_id).eq('owner_id',ownerId);if(imgError||images?.length!==selectedImages.length)throw new Error('Mọi ảnh phải thuộc cùng sản phẩm này.');}
   if(action==='save'){
    const {data,error:saveError}=await db.from('affiliate_content_posts').update({body,image_id:selectedImage,image_ids:selectedImages}).eq('id',post.id).eq('owner_id',ownerId).eq('status','draft').select().maybeSingle();if(saveError||!data)throw new Error('Không lưu được: trạng thái đã thay đổi.');return {post:data};
   }
   if(approved!==true)throw new Error('Duyệt nội dung trước khi đăng.');
-  if(post.channel==='instagram'&&!selectedImage)throw new Error('Instagram bắt buộc có ảnh.');
+  if(format==='feed'&&post.channel==='instagram'&&!selectedImage)throw new Error('Instagram bắt buộc có ảnh.');
+  let videoUrl='';
+  if(format==='reel'){
+   const {data:video,error:videoError}=await db.from('affiliate_product_videos').select('*').eq('id',post.video_id).eq('product_id',post.product_id).eq('owner_id',ownerId).eq('approved',true).single();
+   if(videoError||!video)throw new Error('Video Reel không còn tồn tại hoặc chưa được xác nhận.');
+   videoMetadata(video);
+   const {data:signed,error:signError}=await db.storage.from(VIDEO_BUCKET).createSignedUrl(video.storage_path,3600);
+   if(signError||!signed)throw new Error('Chưa cấp được link video riêng tư cho Meta.');
+   videoUrl=signed.signedUrl;
+  }
   const instagram=post.channel==='instagram',threads=post.channel==='threads';
   const target=instagram?await instagramTarget(db,ownerId):await socialTarget(db,ownerId,threads?'threads':'facebook');
   if(typeof expectedTargetId==='string'&&expectedTargetId&&expectedTargetId!==target.id)throw new Error('Tài khoản đích đã thay đổi. Làm mới và duyệt lại bài trước khi đăng.');
@@ -38,7 +51,8 @@ const {postId,body,approved,action,imageId,expectedTargetId}=input;
   const {data:claim,error:claimError}=await db.from('affiliate_content_posts').update({body,image_id:selectedImage,image_ids:selectedImages,status:'publishing',target_id:target.id}).eq('id',post.id).eq('owner_id',ownerId).eq('status','draft').select().maybeSingle();
   if(claimError||!claim)throw new Error('Bài đang được gửi ở nơi khác. Hãy làm mới lịch sử.');
   try{
-   const result=await publishSocial({channel:post.channel,body,imageUrls,target,deadline:input.deadline,onContainer:async id=>{const {error}=await db.from('affiliate_content_posts').update({container_id:id}).eq('id',post.id).eq('owner_id',ownerId);if(error)throw new Error('Không lưu được container, dừng trước khi publish.');}});
+   const onContainer=async(id:string)=>{const {error}=await db.from('affiliate_content_posts').update({container_id:id}).eq('id',post.id).eq('owner_id',ownerId);if(error)throw new Error('Không lưu được container, dừng trước khi publish.');};
+   const result=format==='reel'?await publishReel({channel:post.channel as 'facebook'|'instagram',body,videoUrl,target,deadline:input.deadline,onContainer}):await publishSocial({channel:post.channel,body,imageUrls,target,deadline:input.deadline,onContainer});
    const {data:saved,error:saveError}=await db.from('affiliate_content_posts').update({status:'published',external_id:result.id,published_at:new Date().toISOString()}).eq('id',post.id).select().single();if(saveError)throw new Error('Meta đã nhận bài nhưng chưa lưu được lịch sử. Kiểm tra tài khoản đích.');
    return {post:saved};
   }catch(error){await db.from('affiliate_content_posts').update({status:'unknown'}).eq('id',post.id).eq('status','publishing');throw new Error(`${error instanceof Error?error.message:'Lỗi kết nối Meta.'} Cần xác minh trên Meta; không tự gửi lại.`,{cause:error});}
