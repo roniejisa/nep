@@ -1,0 +1,52 @@
+/* Spacing only. Colors, fonts, borders, shadows and animations stay in existing styles. */
+:root{
+ --space-4:4px;
+ --space-8:8px;
+ --space-12:12px;
+ --space-16:16px;
+ --space-24:24px;
+ --space-32:32px;
+ --space-48:48px;
+ --page-gutter:var(--space-32);
+ --card-padding:var(--space-24);
+ --control-block:var(--space-8);
+ --control-inline:var(--space-16);
+ /* Existing sidebar geometry, not a spacing scale value. */
+ --sidebar-width:238px;
+}
+.page-content{padding:var(--page-gutter);max-width:1530px;margin:0 auto;min-width:0}
+.topbar{padding:0 var(--page-gutter)}
+.sidebar{width:var(--sidebar-width)}
+.main{min-width:0}
+.page-content>.automation-page{width:100%;padding:0;margin:0 auto}
+.app-shell,.page-content,.setup-main,.setup-layout,.catalog,.composer-panel,.draft-workspace,.automation-layout,.settings-fold,.fold-content,.form-main,.form-images{min-width:0;max-width:100%}
+.setup-card,.social-post{padding:var(--card-padding)}
+.settings-fold.setup-card{padding:0}
+.fold-content{padding:var(--card-padding)}
+.btn{padding:var(--control-block) var(--control-inline)}
+.btn.small{padding:var(--space-8) var(--space-12)}
+.form-field input:not([type=checkbox]),.form-field textarea,.form-field select,.studio-field input,.studio-field select,.simple-search,.readonly-field{padding:var(--control-block) var(--control-inline)}
+.button-row{gap:var(--space-12)}
+.form-field,.studio-field{min-width:0}
+.field-row{gap:var(--space-16)}
+.pagination{padding:var(--space-16) var(--space-24);gap:var(--space-12)}
+.schedule-add,.schedule-channels,.schedule-time-list,.schedule-presets{gap:var(--space-12)}
+.table-scroll{max-width:100%;min-width:0}
+.readonly-field,.setup-copy,.studio-alert,.automation-history article,.post-text-preview,.page-heading>div{overflow-wrap:anywhere;min-width:0}
+.button-row>.btn,.post-actions>.btn{min-width:0;max-width:100%}
+.page-content>.automation-page>.text-btn{margin-bottom:var(--space-16)}
+@media(max-width:1150px){:root{--sidebar-width:210px}}
+@media(max-width:900px){:root{--sidebar-width:180px}}
+@media(max-width:680px){:root{--sidebar-width:238px}}
+@media(max-width:1023px){:root{--page-gutter:var(--space-24)}}
+@media(max-width:639px){
+ :root{--page-gutter:var(--space-16);--card-padding:var(--space-16)}
+ .page-content{padding:var(--page-gutter)}
+ .topbar{padding:0 var(--page-gutter)}
+ .btn{white-space:normal;text-align:center}
+ .pagination{padding:var(--space-16);gap:var(--space-8)}
+ .setup-card,.social-post{padding:var(--card-padding)}
+ .settings-fold.setup-card{padding:0}
+ .fold-content{padding:var(--space-16)}
+ .toolbar-right,.catalog-title,.draft-title,.editor-footer{flex-wrap:wrap}
+}

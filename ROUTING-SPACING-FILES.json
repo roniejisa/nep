@@ -1,0 +1,130 @@
+{
+  "changed": [
+    {
+      "file": "app/(admin)/automation/page.tsx",
+      "reason": "Route App Router riêng; tái sử dụng màn hình hiện có dưới layout quản trị chung."
+    },
+    {
+      "file": "app/(admin)/cai-dat/page.tsx",
+      "reason": "Route App Router riêng; tái sử dụng màn hình hiện có dưới layout quản trị chung."
+    },
+    {
+      "file": "app/(admin)/categories/page.tsx",
+      "reason": "Route App Router riêng; tái sử dụng màn hình hiện có dưới layout quản trị chung."
+    },
+    {
+      "file": "app/(admin)/layout.tsx",
+      "reason": "Layout App Router dùng chung, giữ provider khi đổi màn hình quản trị."
+    },
+    {
+      "file": "app/(admin)/noi-dung/page.tsx",
+      "reason": "Route App Router riêng; tái sử dụng màn hình hiện có dưới layout quản trị chung."
+    },
+    {
+      "file": "app/(admin)/san-pham/page.tsx",
+      "reason": "Route App Router riêng; tái sử dụng màn hình hiện có dưới layout quản trị chung."
+    },
+    {
+      "file": "app/(admin)/thu-vien/page.tsx",
+      "reason": "Route App Router riêng; tái sử dụng màn hình hiện có dưới layout quản trị chung."
+    },
+    {
+      "file": "app/(public)/public.css",
+      "reason": "Áp dụng token và gutter/card padding chuẩn cho trang công khai đã có route riêng."
+    },
+    {
+      "file": "app/globals.css",
+      "reason": "Thay pixel margin/padding/gap bằng token, giữ nguyên các thuộc tính thiết kế khác."
+    },
+    {
+      "file": "app/layout.tsx",
+      "reason": "Nạp token và quy tắc spacing chung, giữ nguyên metadata và cấu trúc root."
+    },
+    {
+      "file": "app/page.tsx",
+      "reason": "Trang chủ chuyển hướng về /san-pham/, riêng kết quả OAuth chuyển về /cai-dat/ và giữ query."
+    },
+    {
+      "file": "app/spacing.css",
+      "reason": "Định nghĩa thang spacing và quy tắc chung; giữ kích thước sidebar theo breakpoint cũ."
+    },
+    {
+      "file": "app/studio.css",
+      "reason": "Chuẩn hóa spacing các card, form, tab và danh sách hiện có, không thêm kiểu trang trí."
+    },
+    {
+      "file": "components/admin-context.tsx",
+      "reason": "Context dùng chung cho phiên đăng nhập, sản phẩm/ảnh, bộ lọc và thao tác quản trị."
+    },
+    {
+      "file": "components/admin-layout.tsx",
+      "reason": "Ghép provider dữ liệu hiện có với shell chung."
+    },
+    {
+      "file": "components/admin-shell.tsx",
+      "reason": "Menu, header, footer và các dialog dùng chung; menu Next Link, active theo URL."
+    },
+    {
+      "file": "components/admin-ui.tsx",
+      "reason": "Di chuyển các helper và AuthModal hiện có để dùng chung, giữ tên và logic."
+    },
+    {
+      "file": "components/admin-workspace-state.tsx",
+      "reason": "Chuyển logic dữ liệu/CRUD hiện có thành hook đặt ở layout; view lấy từ URL."
+    },
+    {
+      "file": "components/automation-panel.tsx",
+      "reason": "Đổi link nội bộ sang Next Link để dùng layout/context liên tục."
+    },
+    {
+      "file": "components/content-screen.tsx",
+      "reason": "Tách nguyên màn hình nội dung AI vào component của route riêng."
+    },
+    {
+      "file": "components/content-studio.tsx",
+      "reason": "Thay khoảng cách inline bằng token, giữ nguyên luồng tạo/sửa/đăng/xóa bài."
+    },
+    {
+      "file": "components/images-screen.tsx",
+      "reason": "Tách nguyên màn hình thư viện ảnh vào component của route riêng."
+    },
+    {
+      "file": "components/products-screen.tsx",
+      "reason": "Tách nguyên màn hình sản phẩm vào component của route riêng."
+    },
+    {
+      "file": "components/setup-screen.tsx",
+      "reason": "Tách nguyên màn hình thiết lập vào component của route riêng."
+    },
+    {
+      "file": "components/site-settings-editor.module.css",
+      "reason": "Dùng cùng token khoảng cách trong form chỉnh thông tin website."
+    },
+    {
+      "file": "lib/admin-routes.ts",
+      "reason": "Ánh xạ đường dẫn, tên màn hình và nhận diện mục đang chọn theo pathname."
+    },
+    {
+      "file": "tests/admin-http-smoke.mjs",
+      "reason": "Kiểm tra HTTP trực tiếp/reload, redirect, một menu active và shell chung."
+    },
+    {
+      "file": "tests/fixtures/spacing-baseline.json",
+      "reason": "CSS trước sửa phục vụ đối chiếu màu, font, bố cục, hiệu ứng trong kiểm tra."
+    },
+    {
+      "file": "tests/routing-spacing.test.mjs",
+      "reason": "Kiểm tra route, redirect OAuth và đối chiếu thuộc tính CSS không thuộc spacing."
+    }
+  ],
+  "removed": [
+    {
+      "file": "app/automation/page.tsx",
+      "reason": "Di chuyển sang app/(admin)/automation/page.tsx; URL /automation/ không đổi."
+    },
+    {
+      "file": "app/categories/page.tsx",
+      "reason": "Di chuyển sang app/(admin)/categories/page.tsx; URL /categories/ không đổi."
+    }
+  ]
+}
