@@ -13,12 +13,20 @@ try{
  const oauth=await originalFetch(base+'/?facebook_result=choose',{redirect:'manual'});assert.equal(oauth.status,307);assert.equal(oauth.headers.get('location'),'/cai-dat/?facebook_result=choose');
  for(const path of ['san-pham','thu-vien','noi-dung','cai-dat','automation','categories']){
   const response=await originalFetch(`${base}/${path}/`);assert.equal(response.status,200,path);const html=await response.text();
-  const active=(html.match(/<a\b[^>]*>/g)||[]).filter(a=>a.includes('aria-current="page"'));
-  assert.equal(active.length,1,path+' has one active menu item');assert.ok(active[0].includes(`href="/${path}/"`),path+' active link points to its URL');
-  assert.equal((html.match(/aria-label="Điều hướng chính"/g)||[]).length,1,path+' has one shared navigation');
+  assert.ok(html.includes('Đăng nhập quản trị'),path+' has an authentication gate');
+  assert.ok(!html.includes('aria-label="Điều hướng chính"'),path+' does not render private navigation');
+  assert.ok(!html.includes('class="app-shell"'),path+' does not render the workspace');
   const reload=await originalFetch(`${base}/${path}/`);assert.equal(reload.status,200,path+' reload');await reload.arrayBuffer();
  }
- console.log('PASS: 2 redirects; 6 direct routes; 6 reload requests; one correctly active menu and shared navigation per route.');
+ for(const path of ['admin/access','admin/initial-links','categories','automation','content/status','integrations/status']) {
+  const response=await originalFetch(`${base}/api/${path}/`);
+  assert.ok(response.status>=400,path+' denies anonymous access');
+  const result=await response.json();assert.ok(result.error,path+' returns an error');
+  assert.ok(!result.products&&!result.jobs&&!result.connections,path+' contains no private records');
+ }
+ const denied=await originalFetch(`${base}/api/admin/access/`,{headers:{Authorization:'Bearer invalid-test-token'}});
+ assert.equal(denied.status,403);assert.equal(denied.headers.get('cache-control'),'private, no-store');
+ console.log('PASS: redirects; 6 anonymous routes and reloads show only the access gate; 6 private APIs deny anonymous access; invalid token denied.');
 }finally{
  if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await app.close();globalThis.fetch=originalFetch;
 }

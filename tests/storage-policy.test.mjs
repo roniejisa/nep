@@ -50,5 +50,17 @@ test('upload policy reproduces the name-shadowing bug and fixes it while isolati
     await assert.rejects(upload(`${userA}/${productA}/wrong-format.jpg`), e => e.code === '42501');
     const { rows } = await db.query('select name from storage.objects');
     assert.deepEqual(rows.map(r=>r.name),[`${userA}/${productA}/fixed.webp`]);
+    // A different authenticated account cannot delete the owner's product or image.
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[userB]);
+    assert.equal((await db.query('delete from public.affiliate_products where id=$1 returning id',[productA])).rows.length,0);
+    assert.equal((await db.query('delete from storage.objects returning id')).rows.length,0);
+    await db.exec('reset role; set role anon');
+    await assert.rejects(db.query('select * from public.affiliate_products'),e=>e.code==='42501');
+    await assert.rejects(db.query('delete from public.affiliate_products'),e=>e.code==='42501');
+    await assert.rejects(db.query('select * from public.affiliate_product_images'),e=>e.code==='42501');
+    await assert.rejects(db.query('delete from public.affiliate_product_images'),e=>e.code==='42501');
+    await assert.rejects(db.query('delete from storage.objects'),e=>e.code==='42501');
+    await db.exec('reset role');
+    assert.equal((await db.query('select id from public.affiliate_products where id=$1',[productA])).rows.length,1);
   } finally { await db.close(); }
 });

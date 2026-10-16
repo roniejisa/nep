@@ -1,0 +1,16 @@
+.admin-login-screen {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: var(--page-gutter);
+}
+.admin-login-card {
+  width: 100%;
+  max-width: 400px;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-24);
+}
+.admin-login-card form {display: grid; gap: var(--space-16)}
+.admin-login-card h1, .admin-login-card p {margin: 0}
+.admin-login-card input {width: 100%; min-width: 0}

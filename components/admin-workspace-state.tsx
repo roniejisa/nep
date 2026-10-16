@@ -4,7 +4,7 @@ import {adminPaths,adminView,type CoreView as View} from '@/lib/admin-routes';
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
 import type {User} from '@supabase/supabase-js';
 
-import {supabase,BUCKET,categories as defaultCategories,initialLinks,readableError,operationError,safeHttpUrl,type Product,type ProductImage} from '@/lib/supabase';
+import {supabase,BUCKET,categories as defaultCategories,readableError,operationError,safeHttpUrl,type Product,type ProductImage} from '@/lib/supabase';
 
 import {paginate} from '@/lib/pagination';
 
@@ -190,6 +190,11 @@ export function useAdminWorkspace(){
   async function importLinks() {
     if (!user) { setAuthOpen(true); return; } if (importing) return; setImporting(true);
     try {
+      const {data:sessionData}=await supabase.auth.getSession();
+      if(!sessionData.session)throw new Error('Vui lòng đăng nhập lại.');
+      const response=await fetch('/api/admin/initial-links/',{headers:{Authorization:`Bearer ${sessionData.session.access_token}`},cache:'no-store'});
+      if(!response.ok)throw new Error('Không có quyền đọc link khởi tạo.');
+      const {links:initialLinks}:{links:string[]}=await response.json();
       const { data: current, error: checkError } = await supabase.from('affiliate_products').select('affiliate_url').in('affiliate_url', initialLinks);
       if (checkError) throw operationError('Kiểm tra link đã nhập', checkError);
       const already = new Set(current?.map(p => p.affiliate_url));
