@@ -1,3 +1,4 @@
+import {slotFormats} from './reel-rules';
 import {assertPublishingQuota} from './publishing-quota';
 import {randomInt,timingSafeEqual} from 'node:crypto';
 import {database,env} from './content-server';
@@ -36,10 +37,21 @@ export async function runAutomation(){
   const {data:eligible,error:eligibleError}=await db.rpc('eligible_affiliate_products',{p_owner:owner});if(eligibleError)throw new Error('Không đọc được giới hạn đăng của sản phẩm.');
   const valid=(products||[]).filter(p=>eligible?.includes(p.id)&&productMatches(p,cfg)&&p.name?.trim()&&p.description?.trim()&&/^https:\/\//.test(p.affiliate_url));
   const {data:images,error:imageError}=await db.from('affiliate_product_images').select('id,product_id').eq('owner_id',owner).limit(12001);if(imageError||((images?.length||0)>12000))throw new Error('Không đọc đủ danh sách ảnh.');
-  const options=cfg.channels.flatMap(channel=>valid.filter(p=>channel!=='instagram'||cfg.max_images>0&&images?.some(i=>i.product_id===p.id)).map(product=>({channel,product})));
+  let formats:('feed'|'reel')[]=['feed'];
+  if(cfg.format_mode!=='feed'||Object.keys(cfg.slot_formats||{}).length){
+   const {data:jobRow,error:slotError}=await db.from('affiliate_automation_jobs').select('slot').eq('id',job).eq('owner_id',owner).single();
+   if(slotError||!jobRow?.slot)throw new Error('Không đọc được mốc giờ đã nhận.');
+   formats=slotFormats(cfg,new Date(jobRow.slot));
+  }
+  let videos:{id:string;product_id:string}[]=[];
+  if(formats.includes('reel')){
+   const {data,error}=await db.from('affiliate_product_videos').select('id,product_id').eq('owner_id',owner).eq('approved',true).limit(10001);
+   if(error||(data?.length||0)>10000)throw new Error('Chưa đọc đủ kho video. Kiểm tra reels.sql.');videos=data||[];
+  }
+  const options=formats.flatMap(format=>cfg.channels.flatMap(channel=>valid.filter(p=>format==='reel'?channel!=='threads'&&videos.some(v=>v.product_id===p.id):channel!=='instagram'||cfg.max_images>0&&images?.some(i=>i.product_id===p.id)).map(product=>({channel,product,format}))));
   const {data:previous,error:previousError}=await db.from('affiliate_automation_jobs').select('product_id').eq('owner_id',owner).eq('status','done').order('created_at',{ascending:false}).limit(1);if(previousError)throw new Error('Không đọc được lịch sử sản phẩm.');
   if(!options.length){
-   const message=!(products?.length)?'Chưa có sản phẩm Sẵn sàng và đã kiểm tra nguồn.':!valid.length?'Không có sản phẩm khớp nguồn đã chọn với đủ tên, mô tả và link HTTPS. Nếu dữ liệu đã đủ, kiểm tra đã chạy automation-unrestricted.sql chưa.':'Các kênh đã chọn cần ảnh nhưng sản phẩm không có ảnh, hoặc số ảnh tối đa đang là 0. Bật Facebook/Threads hoặc thêm ảnh.';
+   const message=!(products?.length)?'Chưa có sản phẩm Sẵn sàng và đã kiểm tra nguồn.':!valid.length?'Không có sản phẩm khớp nguồn đã chọn với đủ tên, mô tả và link HTTPS. Nếu dữ liệu đã đủ, kiểm tra đã chạy automation-unrestricted.sql chưa.':formats.every(f=>f==='reel')?'Chưa có video đã xác nhận của sản phẩm trong nguồn, hoặc chưa bật Facebook/Instagram. Lượt chỉ Reel không tự đổi sang bài thường.':'Không có ảnh/video phù hợp cho kênh và định dạng đã chọn. Kiểm tra kho media của sản phẩm.';
    return finish('skipped',message);
   }
   const alternatives=options.filter(o=>o.product.id!==previous?.[0]?.product_id);
@@ -56,9 +68,10 @@ export async function runAutomation(){
   const {error:selectError}=await db.from('affiliate_automation_jobs').update({channel:selected.channel,product_id:selected.product.id}).eq('id',job);if(selectError)throw new Error('Không lưu được sản phẩm đã chọn.');
   // Requests have a 300s budget; only release AI locks older than 10 min.
   const {error:staleError}=await db.from('affiliate_content_runs').update({status:'failed'}).eq('owner_id',owner).eq('status','running').lt('created_at',new Date(Date.now()-600000).toISOString());if(staleError)throw new Error('Không kiểm tra được lượt AI cũ.');
-  const ownedImages=imageChoices((images||[]).filter(i=>i.product_id===selected.product.id),cfg.max_images,random);
+  const ownedVideo=selected.format==='reel'?pickRandom(videos.filter(v=>v.product_id===selected.product.id),random):null;
+  const ownedImages=selected.format==='reel'?[]:imageChoices((images||[]).filter(i=>i.product_id===selected.product.id),cfg.max_images,random);
   stage='ai';
-  const result=await generateContent(db,owner,{productId:selected.product.id,channels:[selected.channel],provider:cfg.provider,model:cfg.model,length:cfg.copy_length,angle:'problem',imageIds:ownedImages.map(i=>i.id)},{maxAttempts:5,delayMs:10000,requestTimeoutMs:30000,deadline:started+215000,onFailure:async(error,attempt,willRetry)=>{
+  const result=await generateContent(db,owner,{productId:selected.product.id,channels:[selected.channel],provider:cfg.provider,model:cfg.model,length:cfg.copy_length,angle:'problem',imageIds:ownedImages.map(i=>i.id),postFormat:selected.format,videoId:ownedVideo?.id},{maxAttempts:5,delayMs:10000,requestTimeoutMs:selected.format==='reel'?25000:30000,deadline:started+(selected.format==='reel'?180000:215000),onFailure:async(error,attempt,willRetry)=>{
    const detail=explainError(error,'ai');
    const {error:logError}=await db.from('affiliate_automation_errors').insert({owner_id:owner,job_id:job,channel,...detail,message:`AI lần ${attempt}/5: ${detail.message}${willRetry?' · Thử lại sau khoảng 10 giây.':' · Đã dừng thử AI.'}`});
    if(logError)throw new Error('Không lưu được nhật ký thử lại AI.');
@@ -70,10 +83,10 @@ export async function runAutomation(){
   const {error:postError}=await db.from('affiliate_automation_jobs').update({post_id:post.id}).eq('id',job);if(postError)throw new Error('Không lưu được liên kết bài.');
   const {data:latest,error:latestError}=await db.from('affiliate_automation_settings').select('enabled,updated_at').eq('owner_id',owner).single();
   if(latestError||!latest?.enabled||latest.updated_at!==raw.updated_at)return finish('skipped','Cấu hình đã đổi hoặc tắt. Giữ bài ở bản nháp.');
-  if(Date.now()-started>265000)throw new Error('Gần hết thời gian xử lý. Giữ bản nháp, không gửi Meta.');
+  if(Date.now()-started>(selected.format==='reel'?210000:265000))throw new Error('Gần hết thời gian xử lý. Giữ bản nháp, không gửi Meta.');
   stage='publish';
   await publishContent(db,owner,{postId:post.id,body:post.body,imageIds:post.image_ids,action:'publish',approved:true,deadline:started+285000,expectedTargetId:raw.targets[selected.channel]});
-  return finish('done',`Đã tạo và đăng 1 bài · ${result.attempts??1} lần gọi AI.`);
+  return finish('done',`Đã tạo và đăng 1 ${selected.format==='reel'?'Reel':'bài thường'} · ${result.attempts??1} lần gọi AI.`);
  }catch(error){
   const detail=explainError(error,stage);
   const {error:logError}=await db.from('affiliate_automation_errors').insert({owner_id:owner,job_id:job,channel,...detail});

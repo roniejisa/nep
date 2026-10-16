@@ -1,3 +1,5 @@
+> Ghi chú bản cập nhật đăng nhập trước đây. Với source 2.9, đọc REELS-2.9.md và chạy reels.sql; phần không cần SQL bên dưới chỉ áp dụng riêng bản vá đăng nhập cũ.
+
 # Bản cập nhật khóa quản trị
 
 Chưa đăng nhập: chỉ hiện màn hình đăng nhập, không dựng menu, form, bảng dữ liệu hay tải dữ liệu quản trị. Máy chủ phải xác nhận tài khoản trùng `CONTENT_ADMIN_USER_ID` trước khi mở quản trị. Không chấp nhận chỉ có session lưu trong trình duyệt.

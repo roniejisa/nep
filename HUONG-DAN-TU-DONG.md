@@ -1,3 +1,7 @@
+# Nếp 2.9 — thêm Reel và video sản phẩm
+
+Đọc **REELS-2.9.md** để nâng cấp: chạy `supabase/reels.sql` sau `automation-unrestricted.sql`, rồi deploy source mới. Bản này thêm video riêng tư theo sản phẩm, viết mô tả và đăng Reel Facebook/Instagram; lịch chọn Bài thường/Reel/Trộn và định dạng riêng theo giờ. Giữ link affiliate trong mô tả, **không tự gắn thẻ giỏ hàng Shopee**. Threads vẫn dùng bài thường. Lịch cũ được giữ dạng bài thường.
+
 # Nếp 2.8 — Tự viết, tự đăng theo giờ đã chọn
 
 ## Nâng cấp bản hiện tại

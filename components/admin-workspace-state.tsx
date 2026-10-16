@@ -6,6 +6,7 @@ import type {User} from '@supabase/supabase-js';
 
 import {supabase,BUCKET,categories as defaultCategories,readableError,operationError,safeHttpUrl,type Product,type ProductImage} from '@/lib/supabase';
 
+import {VIDEO_BUCKET} from '@/lib/reel-rules';
 import {paginate} from '@/lib/pagination';
 
 import {defaultSettings,type SiteSettings} from '@/lib/site-settings';
@@ -181,6 +182,11 @@ export function useAdminWorkspace(){
   async function removeProduct() {
     if (!deleteTarget || deleting) return; setDeleting(true);
     try {
+      const {count:activePosts,error:activeError}=await supabase.from('affiliate_content_posts').select('id',{head:true,count:'exact'}).eq('product_id',deleteTarget.id).in('status',['publishing','unknown']);
+      if(activeError||activePosts)throw new Error('Không xóa sản phẩm có bài đang gửi/cần xác minh. Kiểm tra Meta trước.');
+      const {data:videos,error:videoError}=await supabase.from('affiliate_product_videos').select('storage_path').eq('product_id',deleteTarget.id);
+      if(videoError)throw new Error('Chưa đọc được video để dọn. Kiểm tra reels.sql.');
+      for(let offset=0;offset<(videos?.length||0);offset+=100){const {error}=await supabase.storage.from(VIDEO_BUCKET).remove(videos!.slice(offset,offset+100).map(v=>v.storage_path));if(error)throw new Error('Chưa xóa được video sản phẩm.');}
       const paths = deleteTarget.product_images.map(img => img.storage_path);
       if (paths.length) { const { error } = await supabase.storage.from(BUCKET).remove(paths); if (error) throw error; }
       const { error } = await supabase.from('affiliate_products').delete().eq('id', deleteTarget.id); if (error) throw error;

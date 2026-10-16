@@ -1,30 +1,11 @@
-# Cập nhật source Nếp lên Vercel
+# Cập nhật source Nếp 2.9 lên Vercel
 
-Source đầy đủ nằm trong thư mục `nep/` của file ZIP.
+1. Đã dùng 2.8: chạy `supabase/reels.sql` trong Supabase SQL Editor. Nếu chưa nâng 2.8, chạy `automation-unrestricted.sql` sau các migration cũ và cài lịch theo `AUTOMATION-2.8.md` trước.
+2. Chép nội dung thư mục `nep/` từ ZIP vào gốc repository (nơi có package.json), không tạo thư mục nep lồng nhau.
+3. Xóa hai file cũ nếu còn: `app/automation/page.tsx` và `app/categories/page.tsx`. Giữ bản trong `app/(admin)/` và giữ nguyên `app/api/automation`.
+4. Commit/push để Vercel deploy. Giữ các biến môi trường và Fluid Compute 300 giây. Bản 2.9 không cần khóa mới riêng cho Reel.
+5. Vào Nội dung AI, chọn sản phẩm, tải video MP4 rồi chọn Reel để thử thủ công. Sau đó chọn định dạng chung hoặc theo từng giờ ở Lịch tự đăng, xác nhận và lưu.
 
-## Quan trọng khi cập nhật repository cũ
+Reel dùng video chuẩn bị sẵn, AI viết mô tả. Link affiliate nằm trong mô tả, **chưa tự gắn thẻ sản phẩm/giỏ hàng Shopee**. Đọc `REELS-2.9.md` để biết thông số video, cách dùng và giới hạn API.
 
-Chép đè file từ ZIP không tự xóa file cũ. Trước khi commit, xóa đúng hai file sau nếu chúng còn trong repository:
-
-```text
-app/automation/page.tsx
-app/categories/page.tsx
-```
-
-Giữ nguyên hai file mới:
-
-```text
-app/(admin)/automation/page.tsx
-app/(admin)/categories/page.tsx
-```
-
-Không xóa `app/api/automation`. Không xóa các biến môi trường đã cài trên Vercel.
-
-1. Giải nén ZIP.
-2. Chép nội dung bên trong `nep/` vào thư mục gốc repository hiện tại, nơi có `package.json`. Không tạo thêm thư mục `nep/` lồng bên trong repository.
-3. Xóa hai file cũ nêu trên; kiểm tra phần thay đổi Git có ghi nhận hai file bị xóa.
-4. Commit và push. Vercel sẽ build lại với cấu hình và biến môi trường hiện có.
-
-Thư mục `(admin)` chỉ dùng gom layout chung, không xuất hiện trên URL. Vì vậy hai bản cũ/mới không được tồn tại đồng thời.
-
-Bản cập nhật routing và spacing này không cần chạy SQL mới. Bản source trước đã build thành công; lỗi trong ảnh là do file route cũ còn sót trong repository triển khai.
+Không xóa khóa/token hoặc dữ liệu đang có. Nếu cron bản 2.8 đã cài thì không cần cài lại cron.
