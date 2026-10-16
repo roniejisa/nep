@@ -1,3 +1,13 @@
+# Nếp 2.8 — tự viết, tự đăng theo lịch, không giới hạn sáng/tối
+
+Bản 2.8 thay thế các giới hạn được mô tả trong ghi chú phiên bản cũ phía dưới. Đọc **HUONG-DAN-TU-DONG.md** để nâng cấp: chạy `supabase/automation-unrestricted.sql`, rồi chạy lại `supabase/automation-schedule.sql`, và deploy source mới. Giữ nguyên khóa và dữ liệu.
+
+- Bỏ giới hạn mỗi sản phẩm một lần sáng/một lần tối, trần lượt lịch mỗi ngày và trần 30 lượt AI/24h của ứng dụng.
+- Mặc định tự động: Gemini `gemini-3.5-flash-lite`, Siêu ngắn, góc viết nêu một phiền toái cụ thể. Có mẫu lịch Mỗi 2 giờ (12 mốc/ngày); giữ nguyên lịch đã lưu cho đến khi bạn đổi.
+- AI tự động: tối đa 5 lần gọi tổng cộng, chờ khoảng 10 giây sau mỗi lần lỗi, giữ nguyên nhà cung cấp/model. Mỗi yêu cầu tối đa 30 giây, cả cron tối đa 300 giây. Không thử lại bước gửi bài sang Meta.
+- Hạn mức thực tế của Instagram/Threads đọc từ Meta; Facebook xử lý theo phản hồi API. Không cam kết miễn phí hoặc số bài không giới hạn từ nhà cung cấp.
+- Giữ khóa đăng nhập, RLS, xác thực admin, khóa một lượt AI đang chạy, chống nhận trùng khung giờ và chống gửi lại cùng bài.
+
 # Nếp 2.3 — OAuth Facebook Fanpage, Instagram và Threads
 
 Bạn có thể đăng nhập/cấp quyền từng nền tảng ngay trong Nếp. Không cần lấy access token thủ công trong Graph API Explorer. Facebook có bước chọn Fanpage rõ ràng sau khi cấp quyền, không tự lấy Page đầu tiên. Mọi token OAuth được mã hóa trước khi lưu Supabase, chỉ server đọc được.
@@ -361,7 +371,7 @@ Source được kiểm tra kiểu, build và test cục bộ cho chữ ký/hết
 
 ## 8. Bản 2.1 — Các model Google trong ảnh bạn gửi
 
-Model viết bài mới trong danh sách gợi ý: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.6-flash và gemini-3.1-flash-lite. Vào Nội dung AI → AI viết bài: Google Gemini → ô Model, chọn hoặc nhập đúng ID. Tất cả dùng GEMINI_API_KEY; không cần mỗi model một API key. Model nào dùng được, free tier hay tính phí phụ thuộc quyền/model/tier dự án Google. Mặc định vẫn giữ Gemini 3.1 Flash-Lite, không tự đổi sang model trả phí.
+Model viết bài mới trong danh sách gợi ý: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.6-flash và gemini-3.1-flash-lite. Vào Nội dung AI → AI viết bài: Google Gemini → ô Model, chọn hoặc nhập đúng ID. Tất cả dùng GEMINI_API_KEY; không cần mỗi model một API key. Model nào dùng được, free tier hay tính phí phụ thuộc quyền/model/tier dự án Google. Từ bản 2.8, model mặc định là Gemini 3.5 Flash-Lite; không tự chuyển model khi lỗi.
 
 Nano Banana 2 Lite (gemini-3.1-flash-lite-image) dùng riêng để tạo ảnh, không nằm trong danh sách viết bài. Cách dùng:
 1. Chọn một sản phẩm đã có ảnh thật trong Nội dung AI.
@@ -370,7 +380,7 @@ Nano Banana 2 Lite (gemini-3.1-flash-lite-image) dùng riêng để tạo ảnh,
 4. Nhấn Tạo & lưu ảnh WebP. Request gửi ảnh đang chọn và mô tả sang Google. Có thể phát sinh phí API tạo ảnh; không có tự động retry hoặc chuyển model.
 5. Ảnh tạo thành công được lưu trong ảnh sản phẩm, tự chọn để bạn xem và dùng khi đăng. Kiểm tra chữ, logo và chi tiết bao bì vì AI có thể làm sai; hệ thống không bảo đảm giữ nguyên tuyệt đối hình dáng sản phẩm. Chưa có bài nào tự đăng khi tạo ảnh.
 
-Biến tùy chọn GEMINI_IMAGE_MODEL mặc định là gemini-3.1-flash-lite-image. Dùng GEMINI_API_KEY hiện có, không cần key riêng. Đổi biến trên Vercel cần redeploy. Nếu đã chạy social-v2.sql thì bản 2.1 không cần SQL mới. Tạo ảnh và viết bài dùng chung giới hạn 30 lượt/24h và chỉ một tác vụ AI chạy tại một thời điểm; giới hạn Google có thể thấp hơn. Tối đa 12 ảnh/sản phẩm, ảnh WebP đầu ra dưới 2 MB và cạnh dài không quá 1600px.
+Biến tùy chọn GEMINI_IMAGE_MODEL mặc định là gemini-3.1-flash-lite-image. Dùng GEMINI_API_KEY hiện có, không cần key riêng. Đổi biến trên Vercel cần redeploy. Nếu đã chạy social-v2.sql thì bản 2.1 không cần SQL mới. Từ bản 2.8, đã bỏ trần 30 lượt AI/24h; vẫn chỉ một tác vụ AI chạy tại một thời điểm. Hạn mức Google tùy tài khoản. Tối đa 12 ảnh/sản phẩm, ảnh WebP đầu ra dưới 2 MB và cạnh dài không quá 1600px.
 
 Nếu Google trả ảnh nhưng lưu Storage thất bại, API vẫn có thể tính phí. Kiểm tra thông báo trước khi tự bấm tạo lại. Khi server bị dừng và một lượt AI kẹt running, dùng quy trình quản trị trước đó để kiểm tra request đã dừng rồi sửa đúng bản ghi; không reset các lượt đang chạy.
 

@@ -1,3 +1,13 @@
+# Nếp 2.8 — tự viết, tự đăng theo lịch, không giới hạn sáng/tối
+
+Bản 2.8 thay thế các giới hạn được mô tả trong ghi chú phiên bản cũ phía dưới. Đọc **HUONG-DAN-TU-DONG.md** để nâng cấp: chạy `supabase/automation-unrestricted.sql`, rồi chạy lại `supabase/automation-schedule.sql`, và deploy source mới. Giữ nguyên khóa và dữ liệu.
+
+- Bỏ giới hạn mỗi sản phẩm một lần sáng/một lần tối, trần lượt lịch mỗi ngày và trần 30 lượt AI/24h của ứng dụng.
+- Mặc định tự động: Gemini `gemini-3.5-flash-lite`, Siêu ngắn, góc viết nêu một phiền toái cụ thể. Có mẫu lịch Mỗi 2 giờ (12 mốc/ngày); giữ nguyên lịch đã lưu cho đến khi bạn đổi.
+- AI tự động: tối đa 5 lần gọi tổng cộng, chờ khoảng 10 giây sau mỗi lần lỗi, giữ nguyên nhà cung cấp/model. Mỗi yêu cầu tối đa 30 giây, cả cron tối đa 300 giây. Không thử lại bước gửi bài sang Meta.
+- Hạn mức thực tế của Instagram/Threads đọc từ Meta; Facebook xử lý theo phản hồi API. Không cam kết miễn phí hoặc số bài không giới hạn từ nhà cung cấp.
+- Giữ khóa đăng nhập, RLS, xác thực admin, khóa một lượt AI đang chạy, chống nhận trùng khung giờ và chống gửi lại cùng bài.
+
 # Nếp 2.3 — OAuth Fanpage, Instagram, Threads
 
 Đọc phần đầu HUONG-DAN-META.md. Chạy thêm social-oauth.sql cho Facebook/Threads; giữ instagram-oauth.sql cho Instagram. Các nút kết nối nằm trong Thiết lập. Facebook có bước chọn Page rõ ràng. Token lưu mã hóa phía server; không cần lấy access token thủ công.

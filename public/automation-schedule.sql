@@ -1,4 +1,4 @@
--- Run automation.sql, automation-controls.sql automation-flex.sql AND automation-times.sql first. Create Vault secret nep_cron_secret via Dashboard;
+-- Run automation.sql, automation-controls.sql, automation-flex.sql, automation-times.sql AND automation-unrestricted.sql first. Create Vault secret nep_cron_secret via Dashboard;
 -- value must equal CRON_SECRET on Vercel (at least 32 random characters).
 -- No credentials should be inserted into this source file.
 create extension if not exists pg_cron;
@@ -14,7 +14,7 @@ select cron.schedule('nep-hourly-publish','* * * * *',$job$
   url := 'https://nep-hp.vercel.app/api/automation/cron/',
   headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer '||(select decrypted_secret from vault.decrypted_secrets where name='nep_cron_secret' limit 1)),
   body := '{}'::jsonb,
-  timeout_milliseconds := 130000
+  timeout_milliseconds := 310000
  ) where exists (
  select 1 from public.affiliate_automation_settings s
  cross join lateral (select public.due_affiliate_slot(s.owner_id) due) d

@@ -1,88 +1,77 @@
-# Nếp 2.7 — chọn 6, 8 hoặc 10 giờ đăng mỗi ngày
+# Nếp 2.8 — Tự viết, tự đăng theo giờ đã chọn
 
-## Nâng cấp từ 2.6
+## Nâng cấp bản hiện tại
 
-1. Trong Supabase SQL Editor, chạy `supabase/automation-times.sql`.
-2. Chạy lại `supabase/automation-schedule.sql`. Script cập nhật job cũ theo cùng tên, không tạo lịch trùng. Giữ nguyên CRON_SECRET và secret Vault.
-3. Cập nhật source 2.7 lên Vercel và redeploy.
-4. Mở https://nep-hp.vercel.app/automation/ → chọn mẫu 6 / 8 / 10 bài mỗi ngày, thêm/bỏ giờ theo ý muốn → chọn sản phẩm/kênh → bật, xác nhận tự đăng và lưu.
+1. Trong Supabase → SQL Editor, chạy toàn bộ `supabase/automation-unrestricted.sql` trong ZIP, sau `automation-times.sql` và các migration cũ. **Bắt buộc chạy SQL này** để bỏ trigger và giới hạn cũ; chỉ deploy code là chưa đủ.
+2. Chép nội dung thư mục `nep/` vào gốc repository rồi deploy Vercel. Giữ các biến môi trường hiện có. Xóa hai file cũ `app/automation/page.tsx` và `app/categories/page.tsx` nếu còn; giữ các trang tương ứng trong `app/(admin)/` và giữ `app/api/automation`.
+3. Bảo đảm dự án Vercel dùng Fluid Compute, hỗ trợ function chạy 300 giây. Source đã đặt `maxDuration=300` cho cron, tạo bài và đăng bài.
+4. Chạy lại `supabase/automation-schedule.sql`. Script cập nhật job cùng tên, không tạo lịch trùng. Giữ nguyên Vault `nep_cron_secret` và `CRON_SECRET`. Timeout HTTP cron mới là 310 giây.
+5. Mở `/automation/`, chọn **Mỗi 2 giờ · 12 bài** nếu muốn đổi sang lịch này, chọn nguồn/kênh, bật lịch, xác nhận tự đăng và lưu. Lịch đã lưu trước đây không tự bị đổi giờ. Migration đặt AI lịch hiện có về Gemini `gemini-3.5-flash-lite`, Siêu ngắn; lịch đang tắt vẫn tắt.
 
-Lịch sáng/tối cũ được giữ khi chỉ chạy migration. Khi mở và lưu ở giao diện mới, các giờ cũ được chuyển thành danh sách giờ riêng. Không tự bật lịch đang tắt. Nếu nâng cấp từ bản cũ hơn 2.6, chạy các migration còn thiếu theo thứ tự ở mục cài mới.
+Migration không xóa sản phẩm, ảnh, bài hay token. Nếu đang có lượt AI chạy khi cấu hình thay đổi, server kiểm tra lại và giữ bản nháp thay vì đăng theo cấu hình cũ.
 
-## Cách dùng hằng ngày
+## Cách hoạt động
 
-- Bước 1: Chọn giờ đăng. Mẫu 8 bài/ngày: 07:00, 09:00, 11:00, 14:00, 17:00, 19:00, 21:00, 23:00. Có mẫu 6 và 10; được thêm/bỏ từng giờ.
-- Mỗi giờ đã chọn là tối đa **một bài trên một kênh**. Cho phép 1–24 giờ/ngày; hai giờ cách nhau ít nhất 15 phút, kể cả qua nửa đêm. Giờ tính theo Việt Nam.
-- Bước 2: Chọn toàn bộ kho, danh sách sản phẩm riêng hoặc danh mục riêng. Hệ thống chọn ngẫu nhiên trong nguồn đó. Chỉ sản phẩm Sẵn sàng, đã kiểm tra nguồn, có tên/mô tả/link HTTPS và còn lượt mới được chọn.
-- Bước 3: Bật Facebook/Threads/Instagram, chọn số ảnh tối đa. Đặt 0 = chỉ chữ. Không có ảnh thì bỏ Instagram, không lấy ảnh của sản phẩm khác. Hỗ trợ tối đa 10 ảnh, dùng số ảnh thực có nếu ít hơn.
-- AI và giới hạn nâng cao được thu gọn. Gemini mặc định; model để trống dùng model trên server. Chi phí/quota tùy tài khoản, không bảo đảm model Gemini nào cũng miễn phí.
-- Bấm Lưu lịch đăng. Đóng web hoặc tắt máy không làm lịch dừng, miễn Supabase/Vercel và token/AI vẫn hoạt động.
+Đến giờ → chọn một sản phẩm và một kênh trong nguồn bạn chọn → kiểm tra token và quota Meta → AI viết bài mới → kiểm tra nội dung/link/ảnh → tự đăng công khai → lưu lịch sử. Không cần tạo sẵn bài AI.
 
-Số bài thực tế có thể ít hơn số giờ đã chọn nếu thiếu sản phẩm còn lượt, lỗi hoặc hết hạn mức. Giới hạn ngày gồm các lượt đã nhận, cả lượt lỗi/bỏ qua; tổng AI thủ công và tự động tối đa 30 lượt/24 giờ. Không tự chuyển sang nhà cung cấp trả phí khác khi lỗi.
+Sản phẩm phải có trạng thái **Sẵn sàng**, tích **Tôi đã kiểm tra thông tin nguồn**, đủ tên, mô tả gốc và link HTTPS. Có thể chọn toàn bộ kho, danh sách sản phẩm hoặc danh mục. Không có ảnh/đặt 0 ảnh thì loại Instagram; dùng tối đa 10 ảnh thực có của chính sản phẩm, không lấy ảnh sản phẩm khác.
 
-## Giới hạn sản phẩm và chống đăng lặp
+Đã bỏ giới hạn một lần sáng/một lần tối cho mỗi sản phẩm, trần lượt cron/ngày và trần 30 lượt AI/24h của Nếp. Sản phẩm có thể được chọn lại ở nhiều khung giờ trong ngày, cả khi đăng thủ công. `daily_limit` và bảng lượt sản phẩm cũ chỉ còn để tương thích, không tham gia chặn trong bản mới.
 
-- Vẫn tối đa **một lần trước 12:00 + một lần từ 12:00 mỗi sản phẩm/ngày**, tính chung tất cả kênh và cả đăng thủ công qua Nếp. Bài đăng ngoài Nếp không tự được đồng bộ để đếm.
-- Danh sách giờ mới cho phép đăng buổi trưa/chiều và các giờ khác trong 24 giờ; không bị giới hạn trong hai khoảng cũ.
-- PostgreSQL giữ khóa theo sản phẩm/ngày/buổi; mỗi mốc giờ có khóa riêng. Gọi endpoint nhiều lần không tạo thêm lượt đã nhận. Lịch dọn lỗi không làm mất giới hạn.
-- Bài chưa rõ kết quả vẫn giữ chỗ. Không tự retry bài unknown/publishing. Đổi tài khoản đích làm lịch dừng để xác nhận lại.
-- Scheduler kiểm tra mỗi phút. Có cửa sổ chờ tối đa 5 phút cùng ngày để nhận một giờ vừa đến; không chạy bù các giờ cũ hơn. Thời gian chính xác còn phụ thuộc dịch vụ.
-- Trong UI có nút Tắt lịch; bài đã gửi Meta có thể vẫn hoàn tất. Nếu sửa/tắt trong lúc AI viết, server kiểm tra lại trước khi gửi.
+Mỗi mốc giờ là một bài trên một kênh. Lịch hiện cho cấu hình 1–24 mốc/ngày, cách nhau ít nhất 15 phút; đây là phạm vi cấu hình lịch, không phải quota sản phẩm hoặc tài khoản. Mẫu Mỗi 2 giờ: 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00 (giờ Việt Nam).
 
-## Giao diện và phân trang
+Cron kiểm tra mỗi phút, chỉ nhận mốc vừa đến trong cửa sổ 5 phút cùng ngày, không chạy bù các giờ cũ hơn. Khóa theo mốc giờ ngăn cron nhận trùng; một tài khoản chỉ có một lượt AI đang chạy. Đóng tab/tắt máy không làm lịch server dừng.
 
-- Sản phẩm: 12/trang; ảnh: 24/trang, có tìm kiếm; danh mục: 10/trang, có tìm kiếm.
-- Bài AI: 6/trang, lọc kênh/trạng thái tại server, có thể xem bài cũ qua các trang. Chuyển trang/lọc có cảnh báo nếu còn chỉnh sửa chưa lưu.
-- Nhật ký lỗi và lịch sử tự động: 6/trang, lấy dữ liệu theo trang từ server; tự cập nhật mỗi 30 giây.
-- Danh sách chọn sản phẩm/danh mục cho lịch: 10/trang, lựa chọn được giữ khi đổi trang/tìm kiếm.
-- Kho metadata hiện hỗ trợ tối đa 1.000 sản phẩm. Nếu vượt giới hạn, báo rõ thay vì âm thầm bỏ sản phẩm cuối. Phân trang sản phẩm/ảnh/danh mục dùng dữ liệu đã tải trong phạm vi này; lịch sử bài và nhật ký phân trang trực tiếp ở database.
-- AI nâng cao, tạo ảnh AI, kết nối, hướng dẫn cài đặt và nhật ký mặc định thu gọn; mở khi cần. Khi OAuth trả về, nhóm kết nối tương ứng tự mở để thấy kết quả.
+## Nội dung mặc định và thử lại AI
 
-## Danh mục và nội dung
+- Tự động mặc định: **Gemini `gemini-3.5-flash-lite`**, **Siêu ngắn**, chạm đúng **một phiền toái cụ thể trong sinh hoạt** ngay câu mở đầu. Không mở đầu chung chung, không bịa trải nghiệm, công dụng, giá hoặc giảm giá. Vẫn có thể đổi provider/model/độ dài trong nhóm AI viết bài.
+- Phần AI viết tối đa 150 ký tự Facebook, 120 Threads, 180 Instagram; câu đầu tối đa 70 ký tự, không quá 3 dòng. Hệ thống tự thêm thông báo affiliate và link gốc rồi kiểm tra bài cuối theo kênh.
+- AI lỗi HTTP/mạng/JSON hoặc bài không đạt kiểm tra: tối đa **5 lần gọi tổng cộng** (lần đầu + tối đa 4 lần thử lại), chờ khoảng 10 giây sau lần lỗi. Dừng ngay khi thành công. Mỗi yêu cầu AI chờ tối đa 30 giây.
+- Giữ nguyên provider/model ở mọi lần thử. Một chuỗi thử lại giữ một khóa AI; chỉ lưu một bộ bản nháp sau khi thành công. Không gọi lại AI để thử sửa lỗi lưu database.
+- Có ngân sách thời gian tổng cho cron 300 giây, kiểm tra trước lần thử tiếp theo và trước khi đăng. Nếu không đủ thời gian, có thể dừng sớm hơn 5 lần. Không thử vô hạn.
+- Nhật ký ghi từng lần AI lỗi, thời điểm và thông báo chờ thử lại; thành công ghi số lần gọi AI. Nếu vẫn lỗi sau các lần thử, lịch tạm dừng để xử lý. Các lần lỗi có thể vẫn tiêu thụ token/quota Google; nếu không biết tổng token thì không hiển thị con số đoán.
+- Cơ chế 5 lần áp dụng cron viết bài. Nút tạo bài thủ công và tạo ảnh AI vẫn là một yêu cầu mỗi lần bấm.
 
-Mở `/categories/` để tạo, đổi tên/gộp hoặc xóa nhóm. Nhập tên nhóm mới trong form sản phẩm cũng được. Xóa nhóm chuyển sản phẩm về Khác và tạm dừng lịch đang lọc nhóm đó; không mở rộng lịch sang toàn bộ nhóm Khác. Khác là nhóm dự phòng, không xóa/đổi tên.
+Giữ `GEMINI_API_KEY` trên server Vercel. Đặt `GEMINI_MODEL=gemini-3.5-flash-lite` nếu muốn đồng nhất lựa chọn mặc định thủ công; model điền rõ trong lịch được ưu tiên. Free tier/chi phí phụ thuộc tài khoản Google, không có cam kết miễn phí vô hạn.
 
-Bản nháp AI có thể xóa từng bài hoặc các bản nháp trên trang đang xem. Bài đã đăng dùng Gỡ khỏi thư viện để ẩn tại Nếp; không xóa bài trên Meta, không xóa bằng chứng chống đăng trùng. Bài đang gửi/chưa rõ kết quả được bảo vệ.
+## Hạn mức nền tảng và chống gửi trùng
 
-## Token và lỗi 8 giờ
+Instagram/Threads đọc quota thật qua `content_publishing_limit`/`threads_publishing_limit` với `quota_usage` và `config.quota_total`; không hardcode số bài/ngày. Facebook theo phản hồi quyền/rate limit của API. Nếp kiểm tra trước AI và trước khi gửi; nền tảng vẫn có thể từ chối nếu hạn mức hoặc quyền thay đổi giữa hai bước.
 
-- Kiểm tra token và thử đọc tài khoản Meta trước khi gọi AI. Kiểm tra đọc không bảo đảm có đủ quyền đăng; lỗi publish vẫn được ghi lại.
-- Nhật ký có thời điểm, kênh, bước xử lý, loại lỗi, HTTP/code/subcode và cách khắc phục. Lỗi token, quyền, AI, quota, mạng, cấu hình và dữ liệu được phân biệt; không gọi mọi lỗi mạng là lỗi token.
-- Lỗi làm lịch tạm dừng. Vào Thiết lập để kết nối lại/gia hạn nếu phù hợp, kiểm tra bài trên Meta, rồi xác nhận bật lại. Không thể tự cấp lại quyền đã bị thu hồi mà không có người dùng.
-- Lỗi chi tiết hết hạn sau 8 giờ. Job dọn riêng chạy mỗi phút kể cả khi lịch đăng tắt; xóa vật lý ở lượt cron kế tiếp. Nếu dịch vụ bị dừng thì việc xóa đợi đến khi hoạt động trở lại.
-- Tóm tắt các lượt hoàn tất giữ 48 giờ; sổ giới hạn sản phẩm giữ ngày hiện tại và hôm trước. Không xóa sản phẩm, ảnh hoặc nội dung đã lưu.
-- Có ghi lỗi tạo/đăng thủ công vào cùng nhật ký sau xác thực. Nếu database mất kết nối thì chính việc ghi lỗi cũng có thể thất bại; khi đó xem lỗi phản hồi/Vercel logs.
+**5 lần thử chỉ dành cho AI viết, không lặp lệnh gửi bài sang Meta.** Mỗi bản nháp chỉ được chuyển draft → publishing một lần bằng cập nhật có điều kiện. Bài published/publishing/unknown không tự gửi lại. Nếu chưa rõ kết quả, kiểm tra trực tiếp trên nền tảng trước khi bật lại lịch.
 
-## Cài mới từ đầu
+Meta báo hết quota, token/quyền lỗi hoặc lỗi đăng thì ghi nhật ký và tạm dừng. Không tự cấp lại quyền bị thu hồi. Bỏ trần nội bộ không bỏ qua chính sách hay quota Meta/Google.
 
-Sau các migration sản phẩm/ảnh, nội dung và OAuth của bản gốc (`setup.sql`, `content.sql`, `social-v2.sql` và các SQL OAuth cần dùng), chạy:
+## Đăng nhập, dữ liệu và lỗi
+
+Giữ màn hình đăng nhập trước mọi trang quản trị, xác nhận đúng `CONTENT_ADMIN_USER_ID` từ server, xác thực API mỗi yêu cầu và RLS. Không đổi cách lưu WebP private, không đưa khóa bí mật vào frontend.
+
+Lỗi chi tiết tự hết hạn sau 8 giờ; job dọn riêng chạy mỗi phút kể cả tắt lịch đăng. Tóm tắt lượt hoàn tất giữ 48 giờ. Không tự xóa sản phẩm, ảnh hoặc bài đã lưu. Lịch sử/lỗi phân trang 6 mục, tự cập nhật mỗi 30 giây.
+
+## Cài mới
+
+Sau schema sản phẩm/ảnh, nội dung, social-v2 và các SQL OAuth cần dùng, chạy:
 
 1. `automation.sql`
 2. `automation-controls.sql`
 3. `automation-flex.sql`
 4. `automation-times.sql`
-5. `automation-schedule.sql` (sau khi cài khóa bên dưới)
+5. `automation-unrestricted.sql`
+6. `automation-schedule.sql`
 
-Cài khóa:
+Trước script lịch, cài `CRON_SECRET` dài ít nhất 32 ký tự trong Vercel và Vault secret `nep_cron_secret` cùng giá trị. Có hai job `nep-hourly-publish` và `nep-cleanup-errors`. Tên legacy hourly không quyết định tần suất; giờ đã lưu mới quyết định.
 
-- Tạo chuỗi ngẫu nhiên ít nhất 32 ký tự. Có thể dùng trình quản lý mật khẩu hoặc Node: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
-- Vercel → Settings → Environment Variables: thêm `CRON_SECRET` bằng chuỗi trên, phạm vi Production, rồi redeploy. Không dùng NEXT_PUBLIC_.
-- Supabase Vault: tạo secret `nep_cron_secret` bằng giá trị giống CRON_SECRET. Nếu đã có, cập nhật secret hiện tại, không tạo trùng tên.
-- Bật `pg_cron`, `pg_net`, chạy `automation-schedule.sql`. Có hai job `nep-hourly-publish` và `nep-cleanup-errors`.
-- Không gửi khóa trong chat, commit vào Git hoặc đặt trong URL công khai.
-
-Nếu đổi tên miền, sửa URL trong script lịch rồi chạy lại. Endpoint đúng mặc định: `https://nep-hp.vercel.app/api/automation/cron/`. Mở trực tiếp trong trình duyệt thấy Unauthorized là bình thường vì thiếu header xác thực. Nếu Supabase cũng nhận HTTP 401, kiểm tra Vault/CRON_SECRET và redeploy.
-
-Cron Job runs chỉ cho thấy lệnh đã chạy hoặc HTTP được xếp hàng. Kết quả đăng xem trong quản trị. SQL kiểm tra HTTP gần nhất, không đọc headers chứa khóa:
+Mở `/api/automation/cron/` trực tiếp thấy Unauthorized là bình thường vì thiếu header xác thực. Cron Job runs chỉ chứng minh lệnh chạy/xếp hàng; kết quả đăng xem trong quản trị. Kiểm tra HTTP gần nhất, không đọc header chứa khóa:
 
 ```sql
 select id,status_code,error_msg,created from net._http_response order by created desc limit 10;
 ```
 
-Muốn gỡ lịch đăng nhưng giữ dọn lỗi:
+Tài liệu chính thức:
 
-```sql
-select cron.unschedule('nep-hourly-publish');
-```
+- https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
+- https://developers.facebook.com/documentation/threads/overview
+- https://developers.facebook.com/documentation/instagram-platform/instagram-graph-api/reference/ig-user/content_publishing_limit
+- https://vercel.com/docs/functions/configuring-functions/duration
 
-Tài liệu chính thức: https://supabase.com/docs/guides/cron và https://developers.facebook.com/docs/graph-api/guides/error-handling/
+Đã kiểm thử source/migration cục bộ, chưa chạy migration trên Supabase hoặc đăng bài thật lên tài khoản của bạn.

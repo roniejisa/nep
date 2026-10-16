@@ -8,10 +8,10 @@ const source=await readFile(new URL('../lib/automation-rules.ts',import.meta.url
 const rules=await readFile(new URL('../lib/content-rules.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(rules+'\n'+source.replace(/^import[^\n]+\n/,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const {automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,scheduleTimes,schedulePresets}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
-test('automation rejects invalid channels, models, budgets and explicit state; random choice stays in pool',()=>{
+test('automation rejects invalid channels, models and explicit state; random choice stays in pool',()=>{
  const cfg={enabled:true,channels:['threads'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24};
  assert.equal(automationSettings(cfg).daily_limit,24);
- for(const update of [{enabled:'true'},{channels:[]},{channels:['facebook','facebook']},{provider:'unknown'},{model:'../../secret'},{daily_limit:25},{daily_limit:0},{copy_length:'long'}])assert.throws(()=>automationSettings({...cfg,...update}));
+ for(const update of [{enabled:'true'},{channels:[]},{channels:['facebook','facebook']},{provider:'unknown'},{model:'../../secret'},{copy_length:'long'}])assert.throws(()=>automationSettings({...cfg,...update}));
  assert.equal(pickRandom(['a','b'],()=>0),'a');assert.equal(pickRandom(['a','b'],()=>.9999),'b');assert.throws(()=>pickRandom([]));
 });
 test('database claim is idempotent, respects off switch and daily cap, and denies browser access',async()=>{
@@ -32,7 +32,7 @@ test('database claim is idempotent, respects off switch and daily cap, and denie
  }finally{await db.close();}
 });
 async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false,cfgOverride={},imagesOverride=[]}={}){
- let generated=0,published=0,paused=false;const logs=[];
+ let generated=0,published=0,paused=false;const logs=[],generationRequests=[];
  const cfg={enabled:true,channels:['facebook'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24,targets:{facebook:'123'},updated_at:'version1',...cfgOverride};
  const db={rpc:async(name)=>({data:name==='eligible_affiliate_products'?['product1']:name==='claim_affiliate_automation'?'job1':null,error:null}),from(table){let action='select',payload,columns='';const chain=new Proxy({},{get(_,prop){if(prop==='then')return resolve=>{
  let data=null;
@@ -44,17 +44,17 @@ async function workerFixture({target='123',afterGeneration=false,interrupted=fal
  }else{logs.push({table,payload});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
  return Promise.resolve({data,error:null}).then(resolve);
  };return (...args)=>{if(['select','update'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
- const deps={database:()=>db,env:()=> 'owner1',generateContent:async()=>{generated++;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
+ const deps={database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,assertPublishingQuota:async()=>{},scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
  globalThis.__automationDeps=deps;
  let src=await readFile(new URL('../lib/automation.ts',import.meta.url),'utf8');
  src=src.replace(/^import (?!.*node:crypto).*\n/gm,'');
- src="const {database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
+ src="const {database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders,assertPublishingQuota}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
  const code=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const worker=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
- return {worker,stats:()=>({generated,published,paused,logs})};
+ return {worker,stats:()=>({generated,published,paused,logs,generationRequests})};
 }
 test('hourly worker generates once and publishes only to the consented target',async()=>{
- const f=await workerFixture();assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().generated,1);assert.equal(f.stats().published,1);assert.equal(f.stats().paused,false);
+ const f=await workerFixture();assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().generated,1);assert.equal(f.stats().published,1);assert.equal(f.stats().paused,false);const request=f.stats().generationRequests[0];assert.equal(request.input.angle,'problem');assert.equal(request.input.length,'tiny');assert.equal(request.retry.maxAttempts,5);assert.equal(request.retry.delayMs,10000);assert.equal(request.retry.requestTimeoutMs,30000);
 });
 test('target changes, cancellation, interruptions and uncertain Meta errors prevent silent retries',async()=>{
  for(const [options,expectedGenerated,expectedPublished,expectedStatus] of [

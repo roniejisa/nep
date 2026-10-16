@@ -1,8 +1,8 @@
 import {postImages} from '@/lib/post-images';
-import { generateCopy } from '@/lib/ai-provider';
+import { generateCopy,type RetryOptions } from '@/lib/ai-provider';
 import { composePost, validatePost, selectedChannels, contentBrief,validateGeneratedCopy } from '@/lib/content-rules';
 import type {SupabaseClient} from '@supabase/supabase-js';
-export async function generateContent(db:SupabaseClient,ownerId:string,input:Record<string,any>){
+export async function generateContent(db:SupabaseClient,ownerId:string,input:Record<string,any>,retry:RetryOptions={}){
  let cleanup:(()=>Promise<void>)|undefined;
  try{
     const { productId, provider: chosenProvider, model: chosenModel,channels:requestedChannels,length='short',angle='problem',imageId=null } = input;
@@ -15,16 +15,20 @@ export async function generateContent(db:SupabaseClient,ownerId:string,input:Rec
     if(imageIds.length){const {data:images,error:imgError}=await db.from('affiliate_product_images').select('id').in('id',imageIds).eq('product_id',product.id).eq('owner_id',ownerId);if(imgError||images?.length!==imageIds.length)throw new Error('Ảnh phải thuộc cùng sản phẩm và tài khoản.');}
     const activeChannels=channels.filter(c=>c!=='instagram'||imageIds.length>0);
     if(!activeChannels.length)throw new Error('Sản phẩm không có ảnh được chọn, không thể tạo bài Instagram. Chọn Facebook hoặc Threads.');
-    // Reserve one slot before counting daily usage: concurrent clicks cannot both call AI.
+    // Keep one active AI run per owner; no application-imposed daily AI quota.
     const { data: run, error: lockError } = await db.from('affiliate_content_runs').insert({ owner_id: ownerId }).select().single();
     if (lockError) throw new Error('Chưa thể tạo bài: hãy chạy content.sql; nếu đã chạy, có thể một lượt AI khác đang hoạt động.');
     cleanup = async () => { await db.from('affiliate_content_runs').update({ status: 'failed' }).eq('id', run.id).eq('status','running'); };
-    const { count, error: countError } = await db.from('affiliate_content_runs').select('id', { head: true, count: 'exact' }).eq('owner_id',ownerId).gte('created_at',new Date(Date.now()-86400000).toISOString());
-    if (countError || (count ?? 0) > 30) throw new Error('Đã đạt giới hạn 30 lượt trong 24 giờ hoặc không đọc được hạn mức.');
-    const { output, tokens, provider, model } = await generateCopy(
+    const { output, tokens, provider, model, attempts } = await generateCopy(
       brief.instructions,
       JSON.stringify({ name:product.name.slice(0,300), description:product.description.slice(0,6000), category:product.category,variant:product.variant.slice(0,300) }),
-      { provider: chosenProvider, model: chosenModel }
+      { provider: chosenProvider, model: chosenModel },
+      {...retry,validate:output=>{
+        for(const channel of activeChannels){
+          validateGeneratedCopy(output[channel],brief.limits[channel]);
+          validatePost(channel,composePost(output[channel],product.affiliate_url));
+        }
+      }}
     );
     const rows = activeChannels.map(channel => {
       if (typeof output[channel] !== 'string' || typeof output.review !== 'string') throw new Error('AI trả nội dung sai định dạng.');
@@ -36,6 +40,6 @@ export async function generateContent(db:SupabaseClient,ownerId:string,input:Rec
     const { data: posts, error: saveError } = await db.from('affiliate_content_posts').insert(rows).select();
     if (saveError) throw new Error('Không lưu được bản nháp. Kiểm tra bảng nội dung trong Supabase.');
     await db.from('affiliate_content_runs').update({ status:'done',tokens,provider,model }).eq('id',run.id);
-    return { posts,tokens,provider,model };
+    return { posts,tokens,provider,model,attempts };
  }finally{if(cleanup)await cleanup();}
 }

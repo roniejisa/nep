@@ -1,3 +1,4 @@
+import {assertPublishingQuota} from '@/lib/publishing-quota';
 import {postImages} from '@/lib/post-images';
 import {socialTarget} from '@/lib/social-connections';
 import {instagramTarget} from '@/lib/instagram-connection';
@@ -30,9 +31,10 @@ const {postId,body,approved,action,imageId,expectedTargetId}=input;
   if(!/^\d+$/.test(target.id)||!/^v\d+\.\d+$/.test(target.version))throw new Error('ID tài khoản hoặc phiên bản API không hợp lệ.');
   const imageUrls:string[]=[];
   if(selectedImages.length){const base=new URL(env('PUBLIC_SITE_URL'));if(base.protocol!=='https:')throw new Error('PUBLIC_SITE_URL phải dùng HTTPS.');for(const id of selectedImages)imageUrls.push(new URL(`/api/social-image/${signImage(id,process.env.SOCIAL_IMAGE_SIGNING_SECRET||env('SUPABASE_SERVICE_ROLE_KEY'))}/`,base.origin).href);}
+  await assertPublishingQuota(post.channel,target);
   const {data:reserved,error:reserveError}=await db.rpc('reserve_affiliate_product_post',{p_owner:ownerId,p_post:post.id});
-  if(reserveError)throw new Error('Không kiểm tra được giới hạn sản phẩm. Chạy automation-controls.sql trước khi đăng.');
-  if(!reserved)throw new Error('Sản phẩm không còn lượt đăng hợp lệ ở thời điểm này. Tối đa một lần trước 12:00 và một lần từ 12:00, tính chung mọi kênh.');
+  if(reserveError)throw new Error('Không xác nhận được bản nháp. Chạy automation-unrestricted.sql sau các migration trước đó.');
+  if(!reserved)throw new Error('Chưa xác nhận được quyền đăng bản nháp. Nếu vẫn gặp giới hạn sáng/tối, hãy chạy automation-unrestricted.sql.');
   const {data:claim,error:claimError}=await db.from('affiliate_content_posts').update({body,image_id:selectedImage,image_ids:selectedImages,status:'publishing',target_id:target.id}).eq('id',post.id).eq('owner_id',ownerId).eq('status','draft').select().maybeSingle();
   if(claimError||!claim)throw new Error('Bài đang được gửi ở nơi khác. Hãy làm mới lịch sử.');
   try{
