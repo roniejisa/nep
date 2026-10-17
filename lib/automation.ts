@@ -101,8 +101,8 @@ export async function runAutomation(){
   if(latestError||!latest?.enabled||latest.updated_at!==raw.updated_at)return finish('skipped','Cấu hình đã đổi hoặc tắt. Giữ bài ở bản nháp.');
   if(Date.now()-started>(selected.format==='reel'?210000:265000))return finish('skipped','Không đủ thời gian gửi Meta. Đã giữ bản nháp; lịch vẫn bật cho khung giờ kế tiếp.');
   stage='publish';
-  await publishContent(db,owner,{postId:post.id,body:post.body,imageIds:post.image_ids,action:'publish',approved:true,deadline:started+285000,expectedTargetId:raw.targets[selected.channel]});
-  return finish('done',`Đã tạo và đăng 1 ${selected.format==='reel'?'Reel':'bài thường'} · ${result.attempts??1} lần gọi AI.`);
+  const published=await publishContent(db,owner,{postId:post.id,body:post.body,imageIds:post.image_ids,action:'publish',approved:true,deadline:started+285000,expectedTargetId:raw.targets[selected.channel]});
+  return finish('done',`Đã tạo và đăng 1 ${selected.format==='reel'?'Reel':'bài thường'} · ${result.attempts??1} lần gọi AI.${published?.warning?' '+published.warning:''}`);
  }catch(error){
   if(stage==='ai'&&error instanceof AIError&&error.reason==='cancelled')return finish('skipped','Đã dừng gọi AI vì lịch tắt hoặc cấu hình đổi.');
   const detail=explainError(error,stage);

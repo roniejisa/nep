@@ -2,7 +2,7 @@ import {postImages} from '@/lib/post-images';
 import {OperationError} from '@/lib/operation-error';
 import {postFormat} from '@/lib/reel-rules';
 import { generateCopy,AIError,type RetryOptions } from '@/lib/ai-provider';
-import { composePost, validatePost, selectedChannels, contentBrief,validateGeneratedCopy,normalizeGeneratedCopy } from '@/lib/content-rules';
+import { composePost, affiliateComment, validatePost, selectedChannels, contentBrief,validateGeneratedCopy,normalizeGeneratedCopy } from '@/lib/content-rules';
 import type {SupabaseClient} from '@supabase/supabase-js';
 export async function generateContent(db:SupabaseClient,ownerId:string,input:Record<string,any>,retry:RetryOptions={}){
  let runId:string|undefined;
@@ -25,8 +25,8 @@ export async function generateContent(db:SupabaseClient,ownerId:string,input:Rec
     const activeChannels=channels.filter(c=>format==='reel'||c!=='instagram'||imageIds.length>0);
     if(!activeChannels.length)throw new Error('Sản phẩm không có ảnh được chọn, không thể tạo bài Instagram. Chọn Facebook hoặc Threads.');
     const brief=contentBrief(length,angle,activeChannels);
-    const {error:schemaError}=await db.from('affiliate_content_posts').select('id,post_format,video_id').eq('owner_id',ownerId).limit(1);
-    if(schemaError)throw new OperationError('Chưa xác nhận được cấu trúc bảng nội dung. Chạy reels.sql sau các migration cũ trước khi gọi AI.','database');
+    const {error:schemaError}=await db.from('affiliate_content_posts').select('id,post_format,video_id,affiliate_comment_status').eq('owner_id',ownerId).limit(1);
+    if(schemaError)throw new OperationError('Chưa xác nhận được cấu trúc bảng nội dung. Chạy reels.sql và affiliate-placement.sql sau các migration cũ trước khi gọi AI.','database');
     // Keep one active AI run per owner; no application-imposed daily AI quota.
     const { data: run, error: lockError } = await db.from('affiliate_content_runs').insert({ owner_id: ownerId }).select().single();
     if (lockError) throw new Error('Chưa thể tạo bài: hãy chạy content.sql; nếu đã chạy, có thể một lượt AI khác đang hoạt động.');
@@ -40,16 +40,16 @@ export async function generateContent(db:SupabaseClient,ownerId:string,input:Rec
         for(const channel of activeChannels){
           output[channel]=normalizeGeneratedCopy(output[channel]);
           try{validateGeneratedCopy(output[channel],brief.limits[channel]);}catch(error){throw new Error(`${channel}: ${error instanceof Error?error.message:'Nội dung chưa hợp lệ.'}`);}
-          validatePost(channel,composePost(output[channel],product.affiliate_url));
+          validatePost(channel,composePost(output[channel],product.affiliate_url,channel));
         }
       }}
     );
     const rows = activeChannels.map(channel => {
       if (typeof output[channel] !== 'string' || typeof output.review !== 'string') throw new Error('AI trả nội dung sai định dạng.');
       validateGeneratedCopy(output[channel],brief.limits[channel]);
-      const body = composePost(output[channel],product.affiliate_url);
+      const body = composePost(output[channel],product.affiliate_url,channel);
       validatePost(channel,body);
-      return { owner_id:ownerId,product_id:product.id,run_id:run.id,channel,body,review:output.review,image_id:imageIds[0]||null,image_ids:imageIds,provider,model,copy_length:length,post_format:format,video_id:videoId };
+      return { owner_id:ownerId,product_id:product.id,run_id:run.id,channel,body,affiliate_comment_text:channel==='facebook'?affiliateComment(product.affiliate_url):null,review:output.review,image_id:imageIds[0]||null,image_ids:imageIds,provider,model,copy_length:length,post_format:format,video_id:videoId };
     });
     const { data: posts, error: saveError } = await db.from('affiliate_content_posts').insert(rows).select();
     if (saveError) throw new Error('Không lưu được bản nháp. Kiểm tra bảng nội dung trong Supabase.');

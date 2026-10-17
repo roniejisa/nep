@@ -4,13 +4,13 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 import {postFormat,VIDEO_BUCKET,videoMetadata} from '../lib/reel-rules.ts';
 import {postImages} from '../lib/post-images.ts';
-import {hasDisclosure,validatePost,isChannel,composePost} from '../lib/content-rules.ts';
+import {affiliateComment,validatePost,isChannel,composePost} from '../lib/content-rules.ts';
 
 async function fixture({missingVideo=false,uncertain=false}={}){
  const state={status:'draft',calls:0,signed:0,claims:0};
  const productId='11111111-1111-4111-8111-111111111111',videoId='22222222-2222-4222-8222-222222222222';
- const body=composePost('Áo giặt xong vẫn lo mùi?','https://example.com/affiliate');
- const post={id:'post',product_id:productId,channel:'instagram',body,post_format:'reel',video_id:videoId,status:'draft'};
+ const body=composePost('Áo giặt xong vẫn lo mùi?','https://example.com/affiliate','instagram');
+ const post={id:'post',product_id:productId,channel:'instagram',body,post_format:'reel',video_id:videoId,status:'draft',affiliate_comment_status:'none'};
  const db={storage:{from(bucket){assert.equal(bucket,VIDEO_BUCKET);return {async createSignedUrl(path,expires){state.signed++;assert.equal(path,'owner/product/approved.mp4');assert.equal(expires,3600);return {data:{signedUrl:'https://storage.example.com/signed-approved-video.mp4'},error:null};}};}},rpc:async()=>({data:true,error:null}),from(table){let action='select',payload;const filters={};const chain=new Proxy({},{get(_,key){if(key==='then')return resolve=>{
   let data=null;
   if(table==='affiliate_content_posts'){
@@ -24,9 +24,9 @@ async function fixture({missingVideo=false,uncertain=false}={}){
   }
   return Promise.resolve({data,error:null}).then(resolve);
  };return(...args)=>{if(key==='update'){action='update';payload=args[0];}if(key==='eq')filters[args[0]]=args[1];return chain;};}});return chain;}};
- globalThis.__reelPipeline={postFormat,VIDEO_BUCKET,videoMetadata,postImages,hasDisclosure,validatePost,isChannel,signImage:()=>assert.fail(),env:()=>assert.fail(),assertPublishingQuota:async()=>{},instagramTarget:async()=>({id:'123',token:'private',version:'v26.0'}),socialTarget:async()=>assert.fail(),publishSocial:async()=>assert.fail('must not publish a Reel as a photo'),publishReel:async input=>{state.calls++;assert.equal(input.videoUrl,'https://storage.example.com/signed-approved-video.mp4');assert.equal(input.body,body);await input.onContainer('container');if(uncertain)throw new Error('Meta result uncertain');return {id:'published-reel'};}};
+ globalThis.__reelPipeline={postFormat,VIDEO_BUCKET,videoMetadata,postImages,composePost,affiliateComment,validatePost,isChannel,signImage:()=>assert.fail(),env:()=>assert.fail(),assertPublishingQuota:async()=>{},instagramTarget:async()=>({id:'123',token:'private',version:'v26.0'}),socialTarget:async()=>assert.fail(),publishSocial:async()=>assert.fail('must not publish a Reel as a photo'),publishReel:async input=>{state.calls++;assert.equal(input.videoUrl,'https://storage.example.com/signed-approved-video.mp4');assert.equal(input.body,body);await input.onContainer('container');if(uncertain)throw new Error('Meta result uncertain');return {id:'published-reel'};}};
  let source=await readFile(new URL('../lib/content-publish.ts',import.meta.url),'utf8');source=source.replace(/^import .*\n/gm,'');
- source='const {postFormat,VIDEO_BUCKET,videoMetadata,postImages,hasDisclosure,validatePost,isChannel,signImage,env,assertPublishingQuota,instagramTarget,socialTarget,publishSocial,publishReel}=globalThis.__reelPipeline;\n'+source+'\n//'+Math.random();
+ source='const {postFormat,VIDEO_BUCKET,videoMetadata,postImages,composePost,affiliateComment,validatePost,isChannel,signImage,env,assertPublishingQuota,instagramTarget,socialTarget,publishSocial,publishReel}=globalThis.__reelPipeline;\n'+source+'\n//'+Math.random();
  const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const {publishContent}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
  const send=()=>publishContent(db,'owner',{postId:'post',body,action:'publish',approved:true,expectedTargetId:'123',postFormat:'feed',videoId:'attacker',videoUrl:'https://attacker.example.com/',imageIds:['foreign-image']});

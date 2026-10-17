@@ -1,3 +1,5 @@
+> **Cập nhật 2.10.0 — vị trí link theo nền tảng.** Chạy `supabase/affiliate-placement.sql` sau `reels.sql`, deploy rồi kết nối lại Facebook để cấp `pages_manage_engagement`. Facebook: link ở bình luận (ghim thủ công); Instagram: CTA dẫn lên Bio đã đặt link; Threads: link cuối bài. Bài đã đăng không bị đăng lại khi bình luận lỗi. Đọc `AFFILIATE-PLACEMENT-2.10.md` trước khi bật lại lịch.
+
 # Nếp 2.9.1 — sửa lỗi cron gọi AI và tạm dừng
 
 Đọc **CRON-AI-FIX-2.9.1.md**. Chỉ viết kênh cần đăng, chờ AI tối đa 60 giây, sửa đúng bản dài một lần, retry lỗi tạm thời có backoff/Retry-After. 503/timeout/chưa đạt nội dung bỏ qua lượt và giữ lịch cho giờ kế tiếp; sai khóa/model hoặc Meta chưa rõ kết quả vẫn dừng. Nếu đã cài đầy đủ 2.9 thì không cần SQL mới hoặc cài lại cron. Lịch tắt do lỗi cũ cần bật/lưu lại một lần sau deploy.
@@ -7,7 +9,7 @@
 ## Bản này làm được gì?
 
 - Đăng Reel có video lên Facebook Fanpage và Instagram Professional qua API hiện có.
-- Giữ nguyên link affiliate và thông báo hoa hồng trong mô tả Reel.
+- Từ 2.10: mô tả Reel giữ thông báo hoa hồng và CTA, không chứa URL; Facebook gửi link ở bình luận, Instagram dẫn lên Bio.
 - Chọn Bài thường/Reel khi tạo nội dung thủ công; AI viết mô tả ngắn cho video, không tự dựng video.
 - Lịch tự động chọn Chỉ bài thường, Chỉ Reel hoặc Trộn ngẫu nhiên. Mỗi giờ có lựa chọn riêng để ghi đè chế độ chung. Ví dụ 08:00 bài thường, 10:00 Reel, 12:00 bài thường.
 - Chỉ chọn video đã xác nhận, thuộc đúng sản phẩm và chủ tài khoản. Không có video phù hợp thì lượt Chỉ Reel bị bỏ qua; không tự đổi sang bài thường. Chế độ Trộn chọn trong các định dạng/media thực sự có.
@@ -15,7 +17,7 @@
 
 ## Link mô tả khác thẻ sản phẩm Shopee
 
-Link được gắn trong mô tả không đồng nghĩa có thẻ sản phẩm/giỏ hàng bấm được trên video. Khả năng bấm link mô tả phụ thuộc nền tảng/tài khoản; không bảo đảm link bấm trực tiếp, đặc biệt trên Instagram.
+Từ 2.10, mô tả Reel không gắn URL; link ở bình luận Facebook hoặc Bio Instagram. Cách đặt link này không tạo thẻ sản phẩm/giỏ hàng trên video.
 
 Shopee có chương trình Facebook Affiliate Partnership và Instagram Affiliate Partnership, cho tài khoản đủ điều kiện liên kết và gắn thẻ sản phẩm. Tài liệu công khai đã kiểm tra chưa cung cấp luồng API để tự tạo thẻ Shopee này chỉ từ link affiliate và các token Nếp đang có. Bản này **không báo rằng đã tự gắn giỏ hàng**, không đổi link thành mã sản phẩm giả và không đặt CTA sai như “bấm giỏ hàng” khi chưa có thẻ.
 
@@ -80,7 +82,7 @@ Nhật ký token, quota, AI và lỗi đăng vẫn tự hết hạn sau 8 giờ;
 
 ## Kiểm chứng
 
-Có kiểm thử mô phỏng API cho Facebook/Instagram Reels, không gửi trùng, gắn nguyên link mô tả, ưu tiên định dạng từng giờ, chỉ lấy video đúng sản phẩm, migration giữ dữ liệu cũ, RLS và bucket riêng tư. Chưa dùng token thật để đăng Reel hay xác nhận thẻ Shopee trên tài khoản của bạn. Sau deploy, nên thử một Reel thủ công trước khi bật lịch Reel.
+Có kiểm thử mô phỏng API cho Facebook/Instagram Reels, không gửi trùng, bảo toàn link affiliate, ưu tiên định dạng từng giờ, chỉ lấy video đúng sản phẩm, migration giữ dữ liệu cũ, RLS và bucket riêng tư. Chưa dùng token thật để đăng Reel hay xác nhận thẻ Shopee trên tài khoản của bạn. Sau deploy, nên thử một Reel thủ công trước khi bật lịch Reel.
 
 API tham chiếu chính thức:
 

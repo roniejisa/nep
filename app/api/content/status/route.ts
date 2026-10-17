@@ -1,5 +1,5 @@
 import {requestPage} from '@/lib/pagination';
-import {isChannel} from '@/lib/content-rules';
+import {isChannel,composePost,affiliateComment} from '@/lib/content-rules';
 import {socialConnectionStatus} from '@/lib/social-connections';
 import {instagramConnectionStatus} from '@/lib/instagram-connection';
 import { authorize, failure } from '@/lib/content-server';
@@ -12,10 +12,19 @@ export async function GET(request:Request) {
   let query=db.from('affiliate_content_posts').select('*',{count:'exact'}).eq('owner_id',user.id).is('deleted_at',null);
   const postId=url.searchParams.get('postId');if(postId&&/^[0-9a-f-]{36}$/i.test(postId))query=query.eq('id',postId);
   if(isChannel(channel))query=query.eq('channel',channel);
-  if(status==='attention')query=query.in('status',['unknown','publishing']);else if(['draft','published'].includes(status))query=query.eq('status',status);
+  if(status==='attention')query=query.or('status.in.(unknown,publishing),and(status.eq.published,affiliate_comment_status.in.(pending,sending,failed,unknown)))');else if(['draft','published'].includes(status))query=query.eq('status',status);
   const {data:posts,error,count}=await query.order('created_at',{ascending:false}).order('id').range((page-1)*size,page*size-1);
   const {count:draftCount}=await db.from('affiliate_content_posts').select('id',{count:'exact',head:true}).eq('owner_id',user.id).eq('status','draft').is('deleted_at',null);
-  if(error) throw new Error('Chưa đọc được lịch sử. Chạy supabase/content.sql trong SQL Editor.');
+  if(error) throw new Error('Chưa đọc được lịch sử. Kiểm tra các migration nội dung và chạy supabase/affiliate-placement.sql trong SQL Editor.');
+  const productIds=[...new Set((posts||[]).filter(p=>p.status==='draft'&&p.product_id).map(p=>p.product_id))];
+  if(productIds.length){
+   const {data:products,error:productError}=await db.from('affiliate_products').select('id,affiliate_url').eq('owner_id',user.id).in('id',productIds);
+   if(productError)throw new Error('Không đọc được link sản phẩm để chuẩn bị bản nháp.');
+   for(const post of posts||[]){const product=products?.find(p=>p.id===post.product_id);if(post.status==='draft'&&product&&isChannel(post.channel)){
+    post.body=composePost(post.body,product.affiliate_url,post.channel);
+    post.affiliate_comment_text=post.channel==='facebook'?affiliateComment(product.affiliate_url):null;
+   }}
+  }
   const videoIds=[...new Set((posts||[]).filter(p=>p.post_format==='reel'&&p.video_id).map(p=>p.video_id))];
   if(videoIds.length){
    const {data:videos}=await db.from('affiliate_product_videos').select('id,product_id,storage_path,original_name').eq('owner_id',user.id).in('id',videoIds);

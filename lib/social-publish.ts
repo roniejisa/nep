@@ -26,7 +26,13 @@ export async function publishSocial(options:{channel:Channel;body:string;imageUr
   throw new Error('Meta chưa xử lý xong ảnh trong thời gian chờ. Kiểm tra container, không tự gửi lại.');
  };
  if(channel==='facebook'){
-  if(urls.length<2){const id=urls.length?await send(`${target.id}/photos`,{url:urls[0],caption:body,published:'true'}):await send(`${target.id}/feed`,{message:body});return {id};}
+  if(urls.length===1){
+   const values={url:urls[0],caption:body,published:'true',...(target.appSecretProof?{appsecret_proof:target.appSecretProof}:{})};
+   const result=await metaRequest(`${host}/${target.id}/photos`,target.token,values,transport,remaining());
+   // Photo responses may carry both the photo ID and the actual Page post ID.
+   const id=result.post_id||result.id;if(!id)throw new Error('Meta chưa trả mã bài ảnh.');return {id:String(id)};
+  }
+  if(!urls.length)return {id:await send(`${target.id}/feed`,{message:body})};
   const ids:string[]=[];
   for(const url of urls){const id=await send(`${target.id}/photos`,{url,published:'false'});await onContainer(id);ids.push(id);}
   const id=await send(`${target.id}/feed`,{message:body,attached_media:JSON.stringify(ids.map(media_fbid=>({media_fbid})))});return {id};

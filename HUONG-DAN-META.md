@@ -1,10 +1,12 @@
+> **Cập nhật 2.10.0 — vị trí link theo nền tảng.** Chạy `supabase/affiliate-placement.sql` sau `reels.sql`, deploy rồi kết nối lại Facebook để cấp `pages_manage_engagement`. Facebook: link ở bình luận (ghim thủ công); Instagram: CTA dẫn lên Bio đã đặt link; Threads: link cuối bài. Bài đã đăng không bị đăng lại khi bình luận lỗi. Đọc `AFFILIATE-PLACEMENT-2.10.md` trước khi bật lại lịch.
+
 # Nếp 2.9.1 — sửa lỗi cron gọi AI và tạm dừng
 
 Đọc **CRON-AI-FIX-2.9.1.md**. Chỉ viết kênh cần đăng, chờ AI tối đa 60 giây, sửa đúng bản dài một lần, retry lỗi tạm thời có backoff/Retry-After. 503/timeout/chưa đạt nội dung bỏ qua lượt và giữ lịch cho giờ kế tiếp; sai khóa/model hoặc Meta chưa rõ kết quả vẫn dừng. Nếu đã cài đầy đủ 2.9 thì không cần SQL mới hoặc cài lại cron. Lịch tắt do lỗi cũ cần bật/lưu lại một lần sau deploy.
 
 # Nếp 2.9 — thêm Reel và video sản phẩm
 
-Đọc **REELS-2.9.md** để nâng cấp: chạy `supabase/reels.sql` sau `automation-unrestricted.sql`, rồi deploy source mới. Bản này thêm video riêng tư theo sản phẩm, viết mô tả và đăng Reel Facebook/Instagram; lịch chọn Bài thường/Reel/Trộn và định dạng riêng theo giờ. Giữ link affiliate trong mô tả, **không tự gắn thẻ giỏ hàng Shopee**. Threads vẫn dùng bài thường. Lịch cũ được giữ dạng bài thường.
+Đọc **REELS-2.9.md** để nâng cấp: chạy `supabase/reels.sql` sau `automation-unrestricted.sql`, rồi deploy source mới. Bản này thêm video riêng tư theo sản phẩm, viết mô tả và đăng Reel Facebook/Instagram; lịch chọn Bài thường/Reel/Trộn và định dạng riêng theo giờ. Từ 2.10: Facebook đặt link ở bình luận, Instagram dẫn lên Bio; **không tự gắn thẻ giỏ hàng Shopee**. Threads vẫn dùng bài thường. Lịch cũ được giữ dạng bài thường.
 
 # Nếp 2.8 — tự viết, tự đăng theo lịch, không giới hạn sáng/tối
 
@@ -63,7 +65,7 @@ META_GRAPH_VERSION giữ phiên bản Facebook đang dùng; nếu bỏ trống, 
 1. Mở https://developers.facebook.com/apps/ → chọn ứng dụng Nếp.
 2. Mở Facebook Login hoặc Facebook Login for Business → Settings. Nếu chưa có, thêm use case/sản phẩm phù hợp với quản lý Fanpage.
 3. Bật Client OAuth Login / Web OAuth Login nếu dashboard yêu cầu. Trong Valid OAuth Redirect URIs, thêm chính xác callback Facebook ở bảng trên, Save.
-4. Đảm bảo app có các quyền pages_show_list, pages_read_engagement, pages_manage_posts. Người đăng nhập phải có quyền tạo nội dung/quản lý Page cần dùng.
+4. Đảm bảo app có các quyền pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement (bình luận). Người đăng nhập phải có quyền tạo nội dung/quản lý Page cần dùng.
 5. Khi app Development, dùng tài khoản có vai trò admin/developer/tester phù hợp. Nếu quản lý Page cho người ngoài vai trò, cần đáp ứng App Review/Advanced Access của Meta, và các yêu cầu doanh nghiệp nếu dashboard yêu cầu.
 6. Nếu app dùng Facebook Login for Business với Configuration: vào Configurations, tạo/chọn cấu hình phù hợp cho quản lý Page, cấp ba quyền trên và chọn loại token **User Access Token**. Copy Configuration ID vào FACEBOOK_LOGIN_CONFIG_ID trên Vercel rồi redeploy. Khi có config_id, Nếp dùng quyền trong cấu hình này thay cho scope trực tiếp trong URL, nên cấu hình phải có đủ quyền Page. Nếu không dùng cấu hình này thì để biến trống.
 
@@ -288,7 +290,7 @@ Nếu `instagram_business_account` không có/null: kiểm tra tài khoản đã
 4. Mở tab Instagram → Xem trước, kiểm tra nội dung, ảnh, link và ID đích. Tick đồng ý, nhấn Đăng bài.
 5. Server tạo JPEG vuông 1080×1080 với nền trắng khi Meta lấy ảnh. Không lưu thêm JPEG vào Storage. Link ảnh có chữ ký hết hạn sau một giờ; chỉ người có link trong thời gian hiệu lực mới lấy được ảnh.
 6. Meta phải truy cập được PUBLIC_SITE_URL và endpoint ảnh từ internet. Production không được chặn bằng Vercel Authentication/Deployment Protection nếu Meta cần lấy ảnh. Không chuyển bucket Supabase sang public.
-7. Bản này đăng một ảnh lên Feed, chưa đăng Reels, Stories hoặc carousel. Caption có URL affiliate nhưng Instagram thường không cho bấm link trực tiếp trong caption. Bạn cần tự thiết lập link mua ở bio hoặc dùng sticker link trong Story khi phù hợp; web không tự sửa bio.
+7. Bản hiện tại hỗ trợ Feed/carousel và Reel. Caption Instagram không chứa URL; CTA dẫn lên Bio. Bạn đặt link mua hoặc trang tổng hợp sản phẩm trong Bio thủ công; web không tự sửa Bio hoặc gửi DM.
 
 ## 3. Kết nối Threads
 
