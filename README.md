@@ -1,3 +1,5 @@
+> **2.11.1 — Nhập đủ mọi cột CSV, ảnh tùy chọn.** Chạy lại `supabase/product-import.sql` một lần rồi deploy. Mở `/san-pham/nhap/`; có thể nhập lại CSV cũ để bổ sung dữ liệu gốc, không tạo trùng hoặc ghi đè thông tin đã chỉnh. Xem `PRODUCT-IMPORT-2.11.md`.
+
 > **2.11.0 — Nhập CSV Shopee & ảnh hàng loạt.** Chạy `supabase/product-import.sql` sau automation-flex.sql, deploy source, rồi chạy `supabase/product-import-schedule.sql` nếu muốn lấy ảnh khi đóng tab. Trang `/san-pham/nhap/` có preview, chống trùng theo mã, hàng đợi ảnh WebP và ghép file ảnh theo mã. Xem `PRODUCT-IMPORT-2.11.md`.
 
 > **2.10.2:** CTA tự nhiên theo từng kênh; không tự thêm câu thông báo hoa hồng trong bài/bình luận. Xem `CTA-2.10.2.md`. Nâng từ 2.10.x không cần SQL hoặc cấu hình cron mới.

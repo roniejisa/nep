@@ -21,7 +21,18 @@
 .bulk-jobs span{font-size:12px;margin-top:var(--space-8)}
 .bulk-jobs p{margin-top:var(--space-8);font-size:13px}
 .product-code{display:block;font-size:11px;color:var(--muted);margin-top:var(--space-4);overflow-wrap:anywhere}
+.product-csv-details{min-width:0;max-width:100%;font-size:13px}
+.product-csv-details dl{display:grid;gap:var(--space-16);margin:0}
+.product-csv-details dl>div{display:grid;grid-template-columns:minmax(0,140px) minmax(0,1fr);gap:var(--space-12);min-width:0}
+.product-csv-details dt{font-weight:600;overflow-wrap:anywhere}
+.product-csv-details dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}
+.product-csv-details>p{margin-bottom:var(--space-16)}
+.csv-preview-details{margin-top:var(--space-12)}
+.csv-preview-details>summary{cursor:pointer;font-size:12px}
+.csv-preview-details .product-csv-details{padding-block:var(--space-16)}
+.csv-preview-details .product-csv-details dl>div{grid-template-columns:minmax(0,1fr);gap:var(--space-4)}
 .catalog-product-tools{display:flex;align-items:center;gap:var(--space-16);flex-wrap:wrap;padding:var(--space-16) var(--card-padding)}
 .catalog-product-tools label{display:flex;align-items:center;gap:var(--space-8);font-size:13px;min-width:0}
 .catalog-product-tools select{min-width:0;max-width:100%;font:inherit;padding:var(--space-8) var(--space-12);border:1px solid var(--line);border-radius:8px;background:white}
 @media(max-width:639px){.bulk-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.bulk-jobs article{flex-direction:column}.catalog-product-tools{align-items:stretch;flex-direction:column}.catalog-product-tools label{justify-content:space-between}.bulk-section>.btn{justify-self:stretch}}
+@media(max-width:639px){.product-csv-details dl>div{grid-template-columns:minmax(0,1fr);gap:var(--space-4)}}

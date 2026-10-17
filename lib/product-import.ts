@@ -1,6 +1,7 @@
 export type ImportFile={name:string;text:string};
-export type ImportItem={key:string;file:string;row:number;external_product_id:string;external_shop_id:string;name:string;affiliate_url:string;source_url:string;shop_name:string;price:number|null;commission_rate:number|null;description:string;image_urls:string[];metadata:Record<string,string>;warnings:string[]};
-export type ImportLine={file:string;row:number;name:string;productId:string;state:'new'|'duplicate'|'invalid'|'existing';message:string;item?:ImportItem};
+export type ImportMetadata={price_raw:string;doanh_thu_raw:string;commission_raw:string;columns:Record<string,string>;file:string;row:string};
+export type ImportItem={key:string;file:string;row:number;external_product_id:string;external_shop_id:string;name:string;affiliate_url:string;source_url:string;shop_name:string;price:number|null;commission_rate:number|null;description:string;image_urls:string[];metadata:ImportMetadata;warnings:string[]};
+export type ImportLine={file:string;row:number;name:string;productId:string;state:'new'|'duplicate'|'invalid'|'existing';message:string;columns:Record<string,string>;item?:ImportItem};
 export const IMPORT_LIMIT=1000;
 const headers={id:'Mã sản phẩm',name:'Tên sản phẩm',price:'Giá',shop:'Tên cửa hàng',rate:'Tỉ lệ hoa hồng',source:'Link sản phẩm',affiliate:'Link ưu đãi'};
 export function csvRows(text:string){
@@ -59,8 +60,8 @@ export function analyzeImport(files:ImportFile[]){
   if(new Set(columns).size!==columns.length)throw new Error(`${file.name}: tên cột bị lặp.`);
   rows.forEach((values,index)=>{
    if(lines.length>=IMPORT_LIMIT)throw new Error('Mỗi đợt tối đa 1.000 dòng.');
-   const row=index+2,record=Object.fromEntries(columns.map((key,i)=>[key,(values[i]||'').trim()]));
-   const line:ImportLine={file:file.name,row,name:record[headers.name]||'',productId:record[headers.id]||'',state:'new',message:''};
+   const row=index+2,rawColumns=Object.fromEntries(columns.map((key,i)=>[key,values[i]||''])),record=Object.fromEntries(Object.entries(rawColumns).map(([key,value])=>[key,value.trim()]));
+   const line:ImportLine={file:file.name,row,name:record[headers.name]||'',productId:record[headers.id]||'',state:'new',message:'',columns:rawColumns};
    try{
     if(values.length!==columns.length)throw new Error('Số ô không khớp số cột; kiểm tra dấu nháy CSV.');
     if(!/^\d{1,20}$/.test(line.productId))throw new Error('Mã sản phẩm phải là chuỗi chữ số.');
@@ -69,10 +70,13 @@ export function analyzeImport(files:ImportFile[]){
     const affiliate=shopeeAffiliateURL(record[headers.affiliate]),description=record['Mô tả']||record['Mô tả sản phẩm']||'';
     if(description.length>6000)throw new Error('Mô tả tối đa 6.000 ký tự.');
     const imageValue=record['Link ảnh']||record['Ảnh sản phẩm']||record['Image URL']||'';
-    const image_urls=[...new Set(imageValue.split(/[|\n]/).map(s=>s.trim()).filter(Boolean).map(imageSourceURL))];
-    if(image_urls.length>6)throw new Error('CSV nhận tối đa 6 link ảnh mỗi sản phẩm, phân cách bằng dấu |.');
-    const item:ImportItem={key:line.productId,file:file.name,row,external_product_id:line.productId,external_shop_id:identity.shopId,name:line.name,affiliate_url:affiliate,source_url:identity.url,shop_name:(record[headers.shop]||'').slice(0,240),price:vnNumber(record[headers.price]||''),commission_rate:vnNumber(record[headers.rate]||'',true),description,image_urls,metadata:{price_raw:record[headers.price]||'',doanh_thu_raw:record['Doanh thu']||'',commission_raw:record['Hoa hồng']||''},warnings:[]};
-    if(!description)item.warnings.push('Chưa có mô tả');if(!image_urls.length)item.warnings.push('Cần thử lấy ảnh từ trang sản phẩm');
+    const warnings:string[]=[],image_urls:string[]=[];
+    const candidates=imageValue.split(/[|\n]/).map(s=>s.trim()).filter(Boolean);
+    if(candidates.length>6)warnings.push('Chỉ thử tối đa 6 link ảnh; giữ toàn bộ link trong dữ liệu CSV gốc.');
+    for(const value of candidates.slice(0,12)){try{const url=imageSourceURL(value);if(!image_urls.includes(url)&&image_urls.length<6)image_urls.push(url);}catch{const message='Link ảnh không được hỗ trợ; bỏ qua ảnh, vẫn nhập dữ liệu CSV.';if(!warnings.includes(message))warnings.push(message);}}
+    const number=(value:string,label:string,percent=false)=>{try{return vnNumber(value,percent);}catch{warnings.push(`${label}: giữ nguyên giá trị CSV, chưa quy đổi thành số.`);return null;}};
+    const item:ImportItem={key:line.productId,file:file.name,row,external_product_id:line.productId,external_shop_id:identity.shopId,name:line.name,affiliate_url:affiliate,source_url:record[headers.source],shop_name:(record[headers.shop]||'').slice(0,240),price:number(record[headers.price]||'','Giá'),commission_rate:number(record[headers.rate]||'','Tỉ lệ',true),description,image_urls,metadata:{price_raw:rawColumns[headers.price]||'',doanh_thu_raw:rawColumns['Doanh thu']||'',commission_raw:rawColumns['Hoa hồng']||'',columns:rawColumns,file:file.name,row:String(row)},warnings};
+    if(!description)item.warnings.push('CSV không có mô tả');
     const old=seen.get(item.key);
     if(old){line.state='duplicate';line.message=`Trùng mã với ${old.file}, dòng ${old.row}; giữ dòng hợp lệ đầu tiên.`;if(old.affiliate_url!==item.affiliate_url||old.external_shop_id!==item.external_shop_id)line.message+=' Link/shop khác nhau: kiểm tra trước khi nhập.';}
     else {seen.set(item.key,item);line.item=item;line.message=item.warnings.join(' · ');}
@@ -83,3 +87,9 @@ export function analyzeImport(files:ImportFile[]){
  return {lines,items:[...seen.values()],total:lines.length,unique:seen.size};
 }
 export function productIdFromFilename(filename:string){const name=filename.replace(/\.[^.]+$/,'');return name.match(/^(\d{5,20})(?:[-_](?:\d{1,3}|[a-zA-Z][\w-]*))?$/)?.[1]||null;}
+export function storedCsvColumns(metadata:unknown):Record<string,string>{
+ if(!metadata||typeof metadata!=='object'||Array.isArray(metadata))return {};
+ const value=metadata as Record<string,unknown>;
+ if(value.columns&&typeof value.columns==='object'&&!Array.isArray(value.columns))return Object.fromEntries(Object.entries(value.columns).filter((entry):entry is [string,string]=>typeof entry[1]==='string'));
+ return Object.fromEntries([['Giá',value.price_raw],['Doanh thu',value.doanh_thu_raw],['Hoa hồng',value.commission_raw]].filter((entry):entry is [string,string]=>typeof entry[1]==='string'));
+}

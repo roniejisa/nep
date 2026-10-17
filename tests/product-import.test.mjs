@@ -3,17 +3,24 @@ import {test} from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import sharp from 'sharp';
-import {analyzeImport,csvRows,vnNumber,shopeeIdentity,imageSourceURL,productIdFromFilename} from '../lib/product-import.ts';
+import {analyzeImport,csvRows,vnNumber,shopeeIdentity,imageSourceURL,productIdFromFilename,storedCsvColumns} from '../lib/product-import.ts';
 import {pageImageURLs,limitedDownload} from '../lib/product-image-fetch.ts';
 import {importedWebP,storeImportedImage,runProductImages} from '../lib/product-image-worker.ts';
 const header='Mã sản phẩm,Tên sản phẩm,Giá,Doanh thu,Tên cửa hàng,Tỉ lệ hoa hồng,Hoa hồng,Link sản phẩm,Link ưu đãi';
 const row=(id='12345678901',price='98,6k',shop='111',name='Sản phẩm nguồn')=>`${id},"${name}","${price}",72,Shop,"12,5%",₫1.000,https://shopee.vn/product/${shop}/${id},https://s.shopee.vn/${id}`;
 const files=[{name:'one.csv',text:'\uFEFF'+header+'\r\n'+row()+'\r\n'+row('12345678902','1,4tr')},{name:'two.csv',text:header+'\n'+row()+'\n'+row('12345678903','259,0k')}];
 test('CSV handles BOM, Vietnamese shorthand, quoted commas/newlines and duplicates across files',()=>{
- const report=analyzeImport(files);assert.equal(report.total,4);assert.equal(report.unique,3);assert.equal(report.lines.filter(l=>l.state==='duplicate').length,1);assert.equal(report.items[0].price,98600);assert.equal(report.items[1].price,1400000);assert.equal(report.items[0].commission_rate,12.5);assert.equal(report.items[0].external_product_id,'12345678901');assert.equal(report.items[0].description,'');assert.equal(report.items[0].metadata.doanh_thu_raw,'72');
+ const report=analyzeImport(files);assert.equal(report.total,4);assert.equal(report.unique,3);assert.equal(report.lines.filter(l=>l.state==='duplicate').length,1);assert.equal(report.items[0].price,98600);assert.equal(report.items[1].price,1400000);assert.equal(report.items[0].commission_rate,12.5);assert.equal(report.items[0].external_product_id,'12345678901');assert.equal(report.items[0].description,'');assert.equal(report.items[0].metadata.doanh_thu_raw,'72');assert.equal(Object.keys(report.items[0].metadata.columns).length,9);assert.equal(report.items[0].metadata.columns['Hoa hồng'],'₫1.000');assert.equal(report.items[0].metadata.file,'one.csv');
  assert.deepEqual(csvRows('a,b\r\n"line\nnext","a ""quote"""\r\n'),[['a','b'],['line\nnext','a "quote"']]);
  assert.equal(vnNumber('₫1.250.000'),1250000);assert.equal(vnNumber('0% ',true),0);assert.equal(vnNumber('12,4tr'),12400000);assert.equal(vnNumber(''),null);assert.throws(()=>vnNumber('101%',true));assert.throws(()=>csvRows('a,b\n"never closed'));
  assert.equal(productIdFromFilename('12345678901_2.webp'),'12345678901');assert.equal(productIdFromFilename('photo12345.jpg'),null);
+});
+test('every CSV column is retained exactly; optional image/number failures never discard the product',()=>{
+ const source='https://shopee.vn/product/111/12345678901?from=csv';
+ const csv=header+',Link ảnh,Cột bổ sung\n'+row('12345678901','Liên hệ').replace('https://shopee.vn/product/111/12345678901',source)+',http://127.0.0.1/photo,"  Giá trị gốc  "';
+ const report=analyzeImport([{name:'full.csv',text:csv}]);assert.equal(report.unique,1);assert.equal(report.lines[0].state,'new');
+ const item=report.items[0];assert.equal(item.price,null);assert.deepEqual(item.image_urls,[]);assert.equal(item.source_url,source);assert.equal(item.metadata.columns['Link sản phẩm'],source);assert.equal(item.metadata.columns['Cột bổ sung'],'  Giá trị gốc  ');assert.equal(item.metadata.columns['Giá'],'Liên hệ');assert.equal(Object.keys(item.metadata.columns).length,11);assert.ok(item.warnings.length>=2);
+ assert.deepEqual(storedCsvColumns(item.metadata),item.metadata.columns);assert.deepEqual(storedCsvColumns({price_raw:'98,6k',doanh_thu_raw:'60k+',commission_raw:'₫1.000'}),{'Giá':'98,6k','Doanh thu':'60k+','Hoa hồng':'₫1.000'});
 });
 test('invalid rows do not poison valid ones; IDs must agree, URL credentials and image SSRF are rejected',()=>{
  const report=analyzeImport([{name:'test.csv',text:header+'\n'+row().replace('/111/12345678901','/111/999')+'\n'+row('12345678902')}]);assert.equal(report.unique,1);assert.equal(report.lines[0].state,'invalid');
@@ -54,7 +61,8 @@ test('SQL imports once per owner/product ID, preserves edits, queues only missin
   const item=analyzeImport(files).items[0];const first=await f.importItem(item);assert.equal(first.state,'inserted');
   await f.db.query("update affiliate_products set description='User edited',status='ready',verified_at=now() where id=$1",[first.id]);
   assert.equal((await f.importItem({...item,affiliate_url:'https://s.shopee.vn/different-link',description:'CSV changed'})).state,'existing');
-  assert.equal((await f.db.query('select count(*)::int n from affiliate_products')).rows[0].n,1);const product=(await f.db.query('select * from affiliate_products')).rows[0];assert.equal(product.description,'User edited');assert.equal(product.affiliate_url,item.affiliate_url);assert.equal(product.status,'ready');
+  assert.equal((await f.db.query('select count(*)::int n from affiliate_products')).rows[0].n,1);const product=(await f.db.query('select * from affiliate_products')).rows[0];assert.equal(product.description,'User edited');assert.equal(product.affiliate_url,item.affiliate_url);assert.equal(product.status,'ready');assert.equal(Object.keys(product.import_metadata.columns).length,9);
+  await f.importItem({...item,metadata:{...item.metadata,columns:{...item.metadata.columns,'Doanh thu':'90k+','Cột mới':'Giữ đủ'}}});const refreshed=(await f.db.query('select * from affiliate_products where id=$1',[first.id])).rows[0];assert.equal(refreshed.import_metadata.columns['Doanh thu'],'90k+');assert.equal(refreshed.import_metadata.columns['Cột mới'],'Giữ đủ');assert.equal(refreshed.description,'User edited');assert.equal(refreshed.affiliate_url,item.affiliate_url);
   assert.equal((await f.importItem({...item,external_shop_id:'999'})).state,'conflict');
   await assert.rejects(f.db.query("insert into affiliate_products(owner_id,name,affiliate_url,source_url) values($1,'manual duplicate','https://s.shopee.vn/manual', $2)",[f.a,item.source_url]),e=>e.code==='23505');
   const other=await f.importItem(item,f.b);assert.equal(other.state,'inserted');

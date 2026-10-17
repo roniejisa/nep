@@ -1,4 +1,4 @@
-# Nếp 2.11.0 — Nhập sản phẩm Shopee hàng loạt
+# Nếp 2.11.1 — Nhập sản phẩm Shopee hàng loạt
 
 ## Kết quả phân tích hai CSV đã gửi
 
@@ -15,7 +15,7 @@
 3. Muốn đóng tab vẫn lấy ảnh, chạy thêm `supabase/product-import-schedule.sql`. Script dùng lại Vault `nep_cron_secret` và `CRON_SECRET` đã cài, tạo job riêng `nep-product-images`, không sửa job đăng bài hay bật lịch đăng bài.
 4. Vào **Sản phẩm → Nhập CSV & lấy ảnh hàng loạt**, đường dẫn `/san-pham/nhap/`.
 5. Chọn cả hai CSV cùng lúc, kiểm tra danh sách xem trước và danh mục, tích xác nhận rồi nhập. Sản phẩm mới là **Nháp**, chưa xác minh nguồn, chưa được cron đăng.
-6. Xem hàng đợi ảnh. Nút **Chạy hàng đợi ảnh** xử lý liên tiếp khi trang đang mở; nút dừng chỉ dừng vòng xử lý của tab sau lượt hiện tại. Cron ảnh đã cài vẫn làm việc độc lập.
+6. Nếu muốn lấy ảnh, mở mục **Ảnh sản phẩm · không bắt buộc**. Không bật lấy ảnh vẫn nhập đủ dữ liệu CSV. Nút **Chạy hàng đợi ảnh** xử lý liên tiếp khi trang đang mở; nút dừng chỉ dừng vòng xử lý của tab sau lượt hiện tại. Cron ảnh đã cài vẫn làm việc độc lập.
 7. Về kho, lọc **Chưa có ảnh** hoặc **Cần mô tả / kiểm tra nguồn**. Bổ sung mô tả thật, kiểm tra nguồn rồi chuyển sang Sẵn sàng theo luồng hiện có.
 
 Chọn lại cùng CSV hoặc nhập lại sau mất kết nối đều an toàn: mã đã có được bỏ qua. Phản hồi mất giữa chừng có thể để một phần đợt đã nhập; nhập lại để tiếp tục, không cần xóa sản phẩm vừa nhập.
@@ -46,7 +46,7 @@ Chọn tối đa 200 ảnh/đợt. Trước khi tải, giao diện hiển thị 
 - Khóa: chủ sở hữu + Shopee + mã sản phẩm dạng chuỗi, không đổi sang số JavaScript.
 - Kiểm tra mã phải khớp link nguồn, tách được cả mã shop. Một ID nhưng shop không khớp sẽ bị báo cần kiểm tra.
 - Preview gộp nhiều CSV. Commit xác minh lại phía server, có khóa DB và unique index, không dựa riêng vào kiểm tra ở trình duyệt.
-- Sản phẩm đã có giữ nguyên tên, giá, mô tả, danh mục, trạng thái, xác minh và link đã chỉnh. Có thể gắn mã còn thiếu nếu khớp link nguồn/link ưu đãi; có thể xếp hàng lấy ảnh còn thiếu.
+- Sản phẩm đã có giữ nguyên tên, giá, mô tả, danh mục, trạng thái, xác minh và link đã chỉnh; bản chụp dữ liệu CSV gốc được cập nhật theo lần nhập mới nhất. Có thể gắn mã còn thiếu nếu khớp link nguồn/link ưu đãi; có thể xếp hàng lấy ảnh còn thiếu.
 - Khi thêm một cột Link ảnh mới rồi nhập lại, hàng đợi lỗi được cập nhật URL ảnh mới, không tạo sản phẩm mới. Nhập lại cùng file không liên tục thử lại trang bị chặn.
 - Migration nhận diện mã từ link nguồn Shopee có sẵn. Nếu kho cũ đã có nhiều bản ghi cùng link nguồn, chỉ một bản được gắn mã tự động; không xóa hay ghép lịch sử. Lượt nhập phát hiện nhiều bản khớp sẽ báo cần xử lý thủ công.
 - Nếu sản phẩm cũ chỉ có link rút gọn khác với CSV và không có link nguồn/mã, không thể khẳng định là cùng sản phẩm. Hãy bổ sung link nguồn có mã cho các mục “Chưa xác định mã sản phẩm” trước khi nhập để tránh bản sao của dữ liệu cũ chưa định danh.
@@ -63,3 +63,12 @@ API nhập, xem hàng đợi, upload đều kiểm tra đăng nhập quản tr�
 ## Kiểm chứng
 
 Đối chiếu chính hai file: 200 dòng → 199 sản phẩm hợp lệ, một dòng trùng, không dòng lỗi sau xử lý định dạng giá. Kiểm thử gồm parser, nguồn ảnh/redirect bị chặn, WebP, nhập lặp, unique/RLS, lease bị ngắt, không ghi đè ảnh và phản hồi DB không chắc chắn. Build/kiểm tra API riêng tư được thực hiện cục bộ; chưa chạy migration, nhập vào Supabase hoặc tải ảnh trên tài khoản triển khai thật của bạn.
+
+## Bổ sung 2.11.1: ưu tiên nhập đủ dữ liệu CSV
+
+- Mọi cột được giữ nguyên giá trị trong `import_metadata.columns`, kể cả cột bổ sung ngoài 9 cột của file hiện tại. Xem trong preview hoặc mở sản phẩm → **Dữ liệu CSV gốc · đầy đủ các cột**. Các trường tên/giá/link dùng để quản lý được ánh xạ riêng; dữ liệu gốc vẫn còn.
+- `Link sản phẩm` được giữ nguyên, dùng để xác định đúng sản phẩm và thử lấy ảnh. `Link ưu đãi` là link affiliate dùng khi đăng. Không cần đi qua link rút gọn khi CSV đã có link sản phẩm.
+- Giá/tỉ lệ không quy đổi được thành số sẽ để trống trường số và hiển thị cảnh báo, giữ giá trị nguyên bản. Link ảnh không hợp lệ chỉ bị bỏ qua, không làm mất cả dòng sản phẩm.
+- Ảnh là tùy chọn. Khi Shopee không cho đọc ảnh, sản phẩm vẫn nhập thành Nháp; không bịa mô tả hoặc ảnh. Instagram tiếp tục bỏ qua sản phẩm không có ảnh theo quy tắc đăng hiện có.
+- Nếu đã chạy SQL bản 2.11.0, chạy lại `supabase/product-import.sql` một lần để cập nhật hàm lưu dữ liệu gốc; sau đó deploy source 2.11.1. Không cần cài lại cron ảnh. Có thể nhập lại CSV cũ để bổ sung đủ cột mà không tạo trùng hay ghi đè thông tin đã sửa.
+- Đối chiếu hai file đính kèm: 200 dòng, 199 mã duy nhất, 1 dòng trùng; kiểm tra đủ 1.791 giá trị thuộc 9 cột của 199 sản phẩm được nhập.

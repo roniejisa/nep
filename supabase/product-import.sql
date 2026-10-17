@@ -78,8 +78,9 @@ begin
    on conflict(product_id) do update set image_urls=excluded.image_urls,max_images=excluded.max_images,status='pending',attempts=0,error=null,claimed_at=null,updated_at=now()
    where affiliate_product_image_jobs.status<>'running' and cardinality(excluded.image_urls)>0 and affiliate_product_image_jobs.image_urls is distinct from excluded.image_urls;
   end if;
-  -- Re-import never rewrites descriptions, links, categories, status or verified_at.
-  return jsonb_build_object('state','existing','id',p.id,'message','Đã có trong kho; giữ nguyên thông tin.');
+  -- Refresh the CSV snapshot only; editable descriptions/links/status remain intact.
+  update public.affiliate_products set import_metadata=coalesce(import_metadata,'{}'::jsonb)||coalesce(p_item->'metadata','{}'::jsonb) where id=p.id and owner_id=p_owner;
+  return jsonb_build_object('state','existing','id',p.id,'message','Đã có trong kho; giữ thông tin đã chỉnh và cập nhật bản CSV gốc.');
  end if;
  if (select count(*) from public.affiliate_products where owner_id=p_owner)>=1000 then return jsonb_build_object('state','capacity','message','Kho đã đủ 1.000 sản phẩm của phiên bản hiện tại.');end if;
  insert into public.affiliate_categories(owner_id,name) values(p_owner,btrim(p_category)) on conflict do nothing;

@@ -27,8 +27,8 @@ export async function POST(request:Request){try{
  if(schemaError||jobSchema)throw new Error('Chạy supabase/product-import.sql sau automation-flex.sql trước khi nhập.');
  if((existing?.length||0)>1000)throw new Error('Kho hiện vượt 1.000 sản phẩm; cần mở rộng giới hạn kho trước khi nhập thêm.');
  if(body.action==='preview'){
-  for(const line of report.lines){if(!line.item)continue;const item=line.item;const matches=(existing||[]).filter(p=>p.external_product_id===item.external_product_id||p.source_url===item.source_url||p.affiliate_url===item.affiliate_url);if(matches.length){line.state='existing';line.message=matches.length>1?'Có nhiều bản ghi khớp; cần kiểm tra, không tạo thêm.':'Đã có trong kho; không ghi đè thông tin. Nếu thiếu ảnh, có thể xếp hàng lấy ảnh.';}}
-  return Response.json({...report,items:undefined,remainingCapacity:Math.max(0,1000-(existing?.length||0))},{headers:{'Cache-Control':'no-store'}});
+  for(const line of report.lines){if(!line.item)continue;const item=line.item;const matches=(existing||[]).filter(p=>p.external_product_id===item.external_product_id||p.source_url===item.source_url||p.affiliate_url===item.affiliate_url);if(matches.length){line.state='existing';line.message=matches.length>1?'Có nhiều bản ghi khớp; cần kiểm tra, không tạo thêm.':'Đã có trong kho; giữ thông tin đã chỉnh và cập nhật bản CSV gốc. Ảnh là tùy chọn.';}}
+  return Response.json({...report,lines:report.lines.map(({item,...line})=>line),items:undefined,remainingCapacity:Math.max(0,1000-(existing?.length||0))},{headers:{'Cache-Control':'no-store'}});
  }
  const category=typeof body.category==='string'?body.category.trim():'';
  if(!category||category.length>80||typeof body.fetchImages!=='boolean'||!Number.isInteger(body.maxImages)||body.maxImages<1||body.maxImages>6||body.confirmed!==true)throw new Error('Chọn danh mục, số ảnh và xác nhận nhập Nháp.');
