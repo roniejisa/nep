@@ -1,6 +1,6 @@
 import {createHmac} from 'node:crypto';
 export type OAuthProvider='facebook'|'threads';
-export const OAUTH_SCOPES={facebook:['pages_show_list','pages_read_engagement','pages_manage_posts'],threads:['threads_basic','threads_content_publish']};
+export const OAUTH_SCOPES={facebook:['pages_show_list','pages_read_engagement','pages_manage_posts','pages_manage_engagement'],threads:['threads_basic','threads_content_publish']};
 export function socialAuthURL(provider:OAuthProvider,appId:string,redirectURI:string,state:string,version='v26.0',configId?:string){
  if(!/^\d+$/.test(appId)||!/^v\d+\.\d+$/.test(version))throw new Error('App ID hoặc phiên bản API không hợp lệ.');
  if(configId&&!/^\d+$/.test(configId))throw new Error('FACEBOOK_LOGIN_CONFIG_ID phải là ID cấu hình dạng số.');

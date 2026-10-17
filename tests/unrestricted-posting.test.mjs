@@ -38,7 +38,7 @@ test('upgrade removes product/day caps for all channels while preserving slot cl
 
 test('five AI attempts share one run lock and save one draft, without a 30/day counter',async()=>{
  let source=await readFile(new URL('../lib/content-generate.ts',import.meta.url),'utf8');
- for(const name of ['post-images','ai-provider','content-rules','reel-rules'])source=source.replaceAll(`@/lib/${name}`,new URL(`../lib/${name}.ts`,import.meta.url).href);
+ for(const name of ['post-images','ai-provider','content-rules','reel-rules','operation-error'])source=source.replaceAll(`@/lib/${name}`,new URL(`../lib/${name}.ts`,import.meta.url).href);
  const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const {generateContent}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
  const original=globalThis.fetch,key=process.env.GEMINI_API_KEY;process.env.GEMINI_API_KEY='test-key';
@@ -55,6 +55,6 @@ test('five AI attempts share one run lock and save one draft, without a 30/day c
  try{
   globalThis.fetch=async()=>{calls++;if(calls<5)return Response.json({error:'temporary'},{status:503});return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({facebook:'Áo giặt xong vẫn lo mùi?\nXem mô tả trước khi chọn.',threads:'Một ý ngắn.',instagram:'Một ý ngắn.',review:'Kiểm tra nguồn.'})}]}}],usageMetadata:{totalTokenCount:70}});};
   const result=await generateContent(db,'owner',{productId:'product',provider:'gemini',model:'gemini-3.5-flash-lite',channels:['facebook'],length:'tiny',angle:'problem',imageIds:[]},{maxAttempts:5,pause:async()=>{}});
-  assert.equal(calls,5);assert.equal(result.attempts,5);assert.equal(runInserts,1);assert.equal(draftInserts,1);assert.equal(counters,0);assert.equal(result.posts.length,1);assert.ok(result.posts[0].body.endsWith(product.affiliate_url));assert.ok(statuses.includes('done'));
+  assert.equal(calls,5);assert.equal(result.attempts,5);assert.equal(runInserts,1);assert.equal(draftInserts,1);assert.equal(counters,0);assert.equal(result.posts.length,1);assert.ok(!result.posts[0].body.includes(product.affiliate_url));assert.ok(result.posts[0].affiliate_comment_text.endsWith(product.affiliate_url));assert.ok(statuses.includes('done'));
  }finally{globalThis.fetch=original;if(key===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=key;}
 });

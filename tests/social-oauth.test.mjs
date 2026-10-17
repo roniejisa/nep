@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {socialAuthURL,exchangeSocialCode,listFacebookPages,refreshThreadsToken} from '../lib/social-oauth.ts';
 test('separate platform authorization URLs bind state/callback and use the right scopes',()=>{
- const fb=new URL(socialAuthURL('facebook','123','https://nep-hp.vercel.app/api/facebook/callback','fb-state','v26.0'));assert.equal(fb.hostname,'www.facebook.com');assert.equal(fb.searchParams.get('scope'),'pages_show_list,pages_read_engagement,pages_manage_posts');assert.equal(fb.searchParams.get('state'),'fb-state');
+ const fb=new URL(socialAuthURL('facebook','123','https://nep-hp.vercel.app/api/facebook/callback','fb-state','v26.0'));assert.equal(fb.hostname,'www.facebook.com');assert.equal(fb.searchParams.get('scope'),'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement');assert.equal(fb.searchParams.get('state'),'fb-state');
  const th=new URL(socialAuthURL('threads','456','https://nep-hp.vercel.app/api/threads/callback','th-state','v1.0'));assert.equal(th.hostname,'threads.com');assert.equal(th.searchParams.get('scope'),'threads_basic,threads_content_publish');assert.equal(th.searchParams.get('client_id'),'456');
  const business=new URL(socialAuthURL('facebook','123','https://example.com','state','v26.0','789'));assert.equal(business.searchParams.get('config_id'),'789');assert.equal(business.searchParams.has('scope'),false);
 });
