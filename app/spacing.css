@@ -35,6 +35,42 @@
 .readonly-field,.setup-copy,.studio-alert,.automation-history article,.post-text-preview,.page-heading>div{overflow-wrap:anywhere;min-width:0}
 .button-row>.btn,.post-actions>.btn{min-width:0;max-width:100%}
 .page-content>.automation-page>.text-btn{margin-bottom:var(--space-16)}
+
+/* One inset belongs to the form, rather than a different inset on each section. */
+.composer-title{padding:var(--card-padding)}
+.composer-fields{
+ display:grid;
+ gap:var(--space-24);
+ padding:var(--card-padding);
+}
+.composer-fields>*{min-width:0;max-width:100%}
+.composer-fields>.composer-form-grid{padding:0}
+.composer-fields>.studio-field,
+.composer-fields>.settings-fold,
+.composer-fields>.composer-media,
+.composer-fields>.instagram-note{margin:0}
+.composer-fields>.channel-picker{padding:0}
+.composer-fields>.composer-media{padding:var(--card-padding)}
+.composer-fields>.composer-advanced>.composer-form-grid{padding:var(--card-padding)}
+.composer-fields>.settings-fold>summary{padding:var(--space-16) var(--card-padding)}
+.composer-fields>.settings-fold>.fold-content{padding:var(--card-padding)}
+.composer-fields .fold-content>.ai-image-panel{margin:0}
+.composer-fields>.instagram-note{padding:var(--space-12) var(--card-padding);overflow-wrap:anywhere}
+.composer-fields>.composer-bottom{
+ max-width:none;
+ margin:0 calc(-1 * var(--card-padding)) calc(-1 * var(--card-padding));
+ padding:var(--space-16) var(--card-padding);
+}
+
+/* Shared cards use the same content edge on every administration screen. */
+.setup-main>.settings-fold{margin:0}
+.setup-layout>.setup-main{gap:var(--space-24)}
+.page-content .automation-layout{gap:var(--space-24)}
+.catalog-title,.toolbar,.catalog-category-filter,.category-tabs,
+.media-search,.image-info,.product-grid,.media-grid,.catalog-footer{
+ padding-inline:var(--card-padding);
+}
+.setup-main>.instagram-connect{margin:0}
 @media(max-width:1150px){:root{--sidebar-width:210px}}
 @media(max-width:900px){:root{--sidebar-width:180px}}
 @media(max-width:680px){:root{--sidebar-width:238px}}

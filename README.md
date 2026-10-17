@@ -1,3 +1,5 @@
+> **2.10.1:** đồng nhất lề các khối quản trị, sửa chỗ thò ra/thụt vào trong Nội dung AI. Xem `UI-ALIGNMENT-2.10.1.md`. Nâng từ 2.10.0 không cần SQL mới.
+
 > **Cập nhật 2.10.0 — vị trí link theo nền tảng.** Chạy `supabase/affiliate-placement.sql` sau `reels.sql`, deploy rồi kết nối lại Facebook để cấp `pages_manage_engagement`. Facebook: link ở bình luận (ghim thủ công); Instagram: CTA dẫn lên Bio đã đặt link; Threads: link cuối bài. Bài đã đăng không bị đăng lại khi bình luận lỗi. Đọc `AFFILIATE-PLACEMENT-2.10.md` trước khi bật lại lịch.
 
 # Nếp 2.9.1 — sửa lỗi cron gọi AI và tạm dừng
