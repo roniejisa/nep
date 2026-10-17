@@ -1,0 +1,22 @@
+/* Keep text clear of decorative icons, including the more specific shared input padding. */
+.form-field .input-icon{margin-top:var(--space-8);min-width:0}
+.form-field .input-icon>input:not([type=checkbox]){margin-top:0;padding-inline-start:var(--space-48);min-width:0}
+.form-field .input-icon>svg{top:50%;left:var(--space-16);transform:translateY(-50%);pointer-events:none}
+.admin-access-warning{position:relative;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:var(--space-16);padding:var(--space-12) var(--page-gutter);background:var(--paper,#f8faf5);color:var(--ink);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.admin-access-warning>span{min-width:0}
+.admin-access-warning>.text-btn{flex-shrink:0}
+/* Long source text and large groups of controls must stay inside their containers. */
+.editor-fields{min-width:0}
+.editor-columns>*{min-width:0}
+.editor-dialog .input-icon{max-width:100%}
+.editor-dialog .verified-check>span{min-width:0;overflow-wrap:anywhere}
+.page-content .button-row{flex-wrap:wrap}
+.product-card-footer{flex-wrap:wrap;row-gap:var(--space-8)}
+.pagination>div{flex-wrap:wrap;min-width:0}
+.product-bulk-dialog .settings-fold>summary{overflow-wrap:anywhere}
+@media(max-width:639px){
+ .admin-access-warning{align-items:flex-start}
+ .editor-dialog .field-row{grid-template-columns:minmax(0,1fr)}
+ .editor-dialog .editor-footer>div{width:100%}
+ .editor-dialog .editor-footer .btn{flex:1}
+}

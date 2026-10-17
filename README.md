@@ -1,3 +1,5 @@
+> **2.12.1 — Không nháy đăng nhập khi chuyển tab.** Giữ workspace khi xác minh nền cùng tài khoản, phân biệt lỗi mạng với lỗi quyền, sửa icon chồng chữ và form mobile. Deploy source; không SQL/biến môi trường mới. Xem `AUTH-UI-2.12.1.md`.
+
 > **2.12.0 — Duyệt Sẵn sàng và quản lý hàng loạt.** Deploy source mới; không có SQL mới nếu đã cài 2.11.1. Vào Sản phẩm → Cho tất cả sẵn sàng, hoặc chọn nhóm để đổi trạng thái/danh mục. Xem `BULK-PRODUCTS-2.12.md`.
 
 > **2.11.1 — Nhập đủ mọi cột CSV, ảnh tùy chọn.** Chạy lại `supabase/product-import.sql` một lần rồi deploy. Mở `/san-pham/nhap/`; có thể nhập lại CSV cũ để bổ sung dữ liệu gốc, không tạo trùng hoặc ghi đè thông tin đã chỉnh. Xem `PRODUCT-IMPORT-2.11.md`.
