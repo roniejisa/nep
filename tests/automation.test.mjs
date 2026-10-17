@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readyIssues} from '../lib/product-readiness.ts';
 import {AIError,isRecoverableAIError} from '../lib/ai-provider.ts';
 import {test} from 'node:test';
 import {readFile} from 'node:fs/promises';
@@ -48,11 +49,11 @@ async function workerFixture({target='123',afterGeneration=false,interrupted=fal
  }else{logs.push({table,payload});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
  return Promise.resolve({data,error:null}).then(resolve);
  };return (...args)=>{if(['select','update'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
- const deps={AIError,isRecoverableAIError,database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;if(generationError)throw generationError;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');return {warning:commentWarning};},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,slotFormats,assertPublishingQuota:async()=>{},scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
+ const deps={readyIssues,AIError,isRecoverableAIError,database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;if(generationError)throw generationError;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');return {warning:commentWarning};},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,slotFormats,assertPublishingQuota:async()=>{},scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
  globalThis.__automationDeps=deps;
  let src=await readFile(new URL('../lib/automation.ts',import.meta.url),'utf8');
  src=src.replace(/^import (?!.*node:crypto).*\n/gm,'');
- src="const {AIError,isRecoverableAIError,database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders,assertPublishingQuota,slotFormats}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
+ src="const {readyIssues,AIError,isRecoverableAIError,database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders,assertPublishingQuota,slotFormats}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
  const code=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const worker=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
  return {worker,stats:()=>({generated,published,paused,logs,generationRequests})};

@@ -24,14 +24,14 @@ try{
   const result=await response.json();assert.ok(result.error,path+' returns an error');
   assert.ok(!result.products&&!result.jobs&&!result.connections,path+' contains no private records');
  }
- for(const path of ['product-import','product-import/upload']){const response=await originalFetch(`${base}/api/${path}/`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.ok(response.status>=400,'anonymous import/upload denied');}
+ for(const path of ['product-import','product-import/upload','products/bulk']){const response=await originalFetch(`${base}/api/${path}/`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.ok(response.status>=400,'anonymous import/upload denied');}
  const cronImages=await originalFetch(`${base}/api/product-import/images/`,{headers:{Authorization:'Bearer invalid-test-cron'}});assert.equal(cronImages.status,401,'media cron requires its secret');
  const anonymousPublish=await originalFetch(`${base}/api/content/publish/`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'publish',approved:true,postId:'anything',body:'test'})});
  assert.ok(anonymousPublish.status>=400,'anonymous post/comment publish denied');
  const denied=await originalFetch(`${base}/api/admin/access/`,{headers:{Authorization:'Bearer invalid-test-token'}});
  assert.equal(denied.status,403);assert.equal(denied.headers.get('cache-control'),'private, no-store');
  for(const method of ['POST','DELETE']){const response=await originalFetch(`${base}/api/product-videos/`,{method,headers:{'Content-Type':'application/json'},body:'{}'});assert.ok(response.status>=400,'anonymous video mutation denied');}
- console.log('PASS: redirects; 7 anonymous routes and reloads show only the access gate; 8 private APIs deny anonymous access; video writes denied; post/comment publish denied; import/upload/cron denied; invalid token denied.');
+ console.log('PASS: redirects; 7 anonymous routes and reloads show only the access gate; 8 private APIs deny anonymous access; video writes denied; post/comment publish denied; import/upload/bulk/cron denied; invalid token denied.');
 }finally{
  if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await app.close();globalThis.fetch=originalFetch;
 }

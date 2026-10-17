@@ -1,3 +1,4 @@
+import {readyIssues} from '@/lib/product-readiness';
 import {slotFormats} from './reel-rules';
 import {assertPublishingQuota} from './publishing-quota';
 import {randomInt,timingSafeEqual} from 'node:crypto';
@@ -47,7 +48,7 @@ export async function runAutomation(){
   const {data:products,error:productsError}=await db.from('affiliate_products').select('id,name,description,affiliate_url,category').eq('owner_id',owner).eq('status','ready').not('verified_at','is',null).order('id').limit(1001);
   if(productsError)throw new Error('Không đọc được sản phẩm.');if((products?.length||0)>1000)throw new Error('Lịch hiện hỗ trợ tối đa 1.000 sản phẩm sẵn sàng.');
   const {data:eligible,error:eligibleError}=await db.rpc('eligible_affiliate_products',{p_owner:owner});if(eligibleError)throw new Error('Không đọc được giới hạn đăng của sản phẩm.');
-  const valid=(products||[]).filter(p=>eligible?.includes(p.id)&&productMatches(p,cfg)&&p.name?.trim()&&p.description?.trim()&&/^https:\/\//.test(p.affiliate_url));
+  const valid=(products||[]).filter(p=>eligible?.includes(p.id)&&productMatches(p,cfg)&&!readyIssues(p).length);
   const {data:images,error:imageError}=await db.from('affiliate_product_images').select('id,product_id').eq('owner_id',owner).limit(12001);if(imageError||((images?.length||0)>12000))throw new Error('Không đọc đủ danh sách ảnh.');
   let formats:('feed'|'reel')[]=['feed'];
   if(cfg.format_mode!=='feed'||Object.keys(cfg.slot_formats||{}).length){
