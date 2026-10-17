@@ -1,0 +1,27 @@
+.bulk-import-page,.bulk-section{display:grid;gap:var(--space-24);min-width:0}
+.bulk-import-page>.page-heading{margin:0}
+.bulk-section>.btn{justify-self:start}
+.bulk-section .form-field{margin:0}
+.bulk-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-16)}
+.bulk-summary>div{display:grid;gap:var(--space-4);min-width:0}
+.bulk-summary strong{font-size:24px;color:var(--ink)}
+.bulk-summary span,.bulk-source{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.bulk-source{display:block;margin-top:var(--space-8)}
+.bulk-section .table-scroll{width:100%;max-width:100%;overflow:auto}
+.bulk-section table{min-width:600px}
+.bulk-section td{vertical-align:top;overflow-wrap:anywhere;max-width:320px}
+.bulk-section p{line-height:1.7;overflow-wrap:anywhere}
+.bulk-section input[type=file]{width:100%;min-width:0;max-width:100%}
+.bulk-section .pagination{padding-inline:0}
+.bulk-results{max-height:320px;overflow:auto;display:grid;gap:var(--space-12);min-width:0}
+.bulk-jobs{display:grid;gap:var(--space-16);min-width:0}
+.bulk-jobs article{display:flex;align-items:start;justify-content:space-between;gap:var(--space-16);padding-block:var(--space-16);border-bottom:1px solid var(--line);min-width:0}
+.bulk-jobs article>div{min-width:0;overflow-wrap:anywhere}
+.bulk-jobs strong,.bulk-jobs span{display:block}
+.bulk-jobs span{font-size:12px;margin-top:var(--space-8)}
+.bulk-jobs p{margin-top:var(--space-8);font-size:13px}
+.product-code{display:block;font-size:11px;color:var(--muted);margin-top:var(--space-4);overflow-wrap:anywhere}
+.catalog-product-tools{display:flex;align-items:center;gap:var(--space-16);flex-wrap:wrap;padding:var(--space-16) var(--card-padding)}
+.catalog-product-tools label{display:flex;align-items:center;gap:var(--space-8);font-size:13px;min-width:0}
+.catalog-product-tools select{min-width:0;max-width:100%;font:inherit;padding:var(--space-8) var(--space-12);border:1px solid var(--line);border-radius:8px;background:white}
+@media(max-width:639px){.bulk-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.bulk-jobs article{flex-direction:column}.catalog-product-tools{align-items:stretch;flex-direction:column}.catalog-product-tools label{justify-content:space-between}.bulk-section>.btn{justify-self:stretch}}
