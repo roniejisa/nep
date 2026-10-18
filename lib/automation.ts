@@ -18,10 +18,10 @@ export async function runAutomation(){
  const started=Date.now(),db=database(),owner=env('CONTENT_ADMIN_USER_ID');
  const {error:cleanupError}=await db.rpc('cleanup_affiliate_automation');if(cleanupError)throw new Error('Chạy automation-controls.sql để bật kiểm soát và dọn lỗi.');
  const {data:schedule,error:scheduleError}=await db.from('affiliate_automation_settings').select('*').eq('owner_id',owner).maybeSingle();if(scheduleError)throw new Error('Không đọc được cấu hình lịch.');
- if(!schedule?.enabled||!scheduledDue(schedule))return {status:'skipped',message:'Lịch tắt hoặc chưa đến giờ đã chọn.'};
+ if(!schedule?.enabled||schedule.schedule_mode!=='times'&&!scheduledDue(schedule))return {status:'skipped',message:'Lịch tắt hoặc chưa đến giờ đã chọn.'};
  const {data:job,error:claimError}=await db.rpc('claim_affiliate_automation',{p_owner:owner});
  if(claimError)throw new Error('Chưa lấy được lượt chạy. Chạy automation.sql trước.');
- if(!job)return {status:'skipped',message:'Lịch tắt, khung giờ đã nhận hoặc một lượt khác đang chạy.'};
+ if(!job)return {status:'skipped',message:'Chưa có mốc giờ chờ xử lý, lịch đã tắt hoặc một lượt khác đang chạy.'};
  let stage='database',channel:Channel|null=null;
  const finish=async(status:string,message:string)=>{const {error}=await db.from('affiliate_automation_jobs').update({status,message,finished_at:new Date().toISOString()}).eq('id',job);if(error)throw new Error('Không lưu được lịch sử tự động.');return {status,message};};
  try{

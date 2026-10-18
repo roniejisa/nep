@@ -13,7 +13,7 @@ const compiled=ts.transpileModule(reelRules+'\n'+rules+'\n'+source.replace(/^imp
 const {automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,scheduleTimes,schedulePresets,slotFormats}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 test('automation rejects invalid channels, models and explicit state; random choice stays in pool',()=>{
  const cfg={enabled:true,channels:['threads'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24};
- assert.equal(automationSettings(cfg).daily_limit,24);
+ assert.equal('daily_limit' in automationSettings(cfg),false);
  for(const update of [{enabled:'true'},{channels:[]},{channels:['facebook','facebook']},{provider:'unknown'},{model:'../../secret'},{copy_length:'long'}])assert.throws(()=>automationSettings({...cfg,...update}));
  assert.equal(pickRandom(['a','b'],()=>0),'a');assert.equal(pickRandom(['a','b'],()=>.9999),'b');assert.throws(()=>pickRandom([]));
 });
@@ -34,7 +34,7 @@ test('database claim is idempotent, respects off switch and daily cap, and denie
  await db.exec('set role authenticated');await assert.rejects(claim());await assert.rejects(db.query('select * from affiliate_automation_settings'));await db.exec('reset role');
  }finally{await db.close();}
 });
-async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false,cfgOverride={},imagesOverride=[],videosOverride=[],generationError=null,interruptedBeforePublish=false,commentWarning=''}={}){
+async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false,cfgOverride={},imagesOverride=[],videosOverride=[],generationError=null,interruptedBeforePublish=false,commentWarning='',clientDue=true}={}){
  let generated=0,published=0,paused=false;const logs=[],generationRequests=[];
  const cfg={enabled:true,channels:['facebook'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24,targets:{facebook:'123'},updated_at:'version1',...cfgOverride};
  const db={rpc:async(name)=>({data:name==='eligible_affiliate_products'?['product1']:name==='claim_affiliate_automation'?'job1':null,error:null}),from(table){let action='select',payload,columns='';const chain=new Proxy({},{get(_,prop){if(prop==='then')return resolve=>{
@@ -49,7 +49,7 @@ async function workerFixture({target='123',afterGeneration=false,interrupted=fal
  }else{logs.push({table,payload});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
  return Promise.resolve({data,error:null}).then(resolve);
  };return (...args)=>{if(['select','update'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
- const deps={readyIssues,AIError,isRecoverableAIError,database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;if(generationError)throw generationError;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');return {warning:commentWarning};},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,slotFormats,assertPublishingQuota:async()=>{},scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
+ const deps={readyIssues,AIError,isRecoverableAIError,database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;if(generationError)throw generationError;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');return {warning:commentWarning};},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,slotFormats,assertPublishingQuota:async()=>{},scheduledDue:()=>clientDue,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
  globalThis.__automationDeps=deps;
  let src=await readFile(new URL('../lib/automation.ts',import.meta.url),'utf8');
  src=src.replace(/^import (?!.*node:crypto).*\n/gm,'');
@@ -123,9 +123,9 @@ test('no image automatically removes Instagram from the random candidate pool',a
  const filtered=await workerFixture({cfgOverride:{selection_mode:'categories',selected_categories:['Not this category']}});assert.equal((await filtered.worker.runAutomation()).status,'skipped');assert.equal(filtered.stats().generated,0);
 });
 
-test('explicit schedules support 6/8/10 slots, reject duplicates/close times and only become due within grace',()=>{
+test('explicit schedules retain presets, reject invalid/duplicate times and expose the legacy client grace helper',()=>{
  for(const count of ['6','8','10'])assert.equal(scheduleTimes(schedulePresets[count]).length,Number(count));
- for(const times of [[],['24:00'],['7:00'],['07:00','07:00'],['07:00','07:10'],['23:55','00:05']])assert.throws(()=>scheduleTimes(times));
+ for(const times of [[],['24:00'],['7:00'],['07:00','07:00']])assert.throws(()=>scheduleTimes(times));
  const cfg={schedule_mode:'times',schedule_times:['07:00','09:00','14:00']};
  assert.equal(scheduledDue(cfg,new Date('2026-10-16T06:59:00+07:00')),false);
  assert.equal(scheduledDue(cfg,new Date('2026-10-16T07:04:00+07:00')),true);
@@ -156,4 +156,10 @@ test('recoverable AI failures skip only the current slot, while bad credentials 
 test('comment failure is visible in cron history without republishing or pausing the schedule',async()=>{
  const f=await workerFixture({commentWarning:'Bài đã đăng. Chưa gửi được bình luận; kiểm tra quyền.'});
  const result=await f.worker.runAutomation();assert.equal(result.status,'done');assert.match(result.message,/Chưa gửi được bình luận/);assert.equal(f.stats().paused,false);assert.equal(f.stats().published,1);
+});
+
+test('minute-slot cron uses the database claim for delayed slots while legacy windows keep their client check',async()=>{
+ const dense=await workerFixture({clientDue:false,cfgOverride:{schedule_mode:'times',schedule_times:['00:00','00:01']}});
+ assert.equal((await dense.worker.runAutomation()).status,'done');assert.equal(dense.stats().generated,1);
+ const legacy=await workerFixture({clientDue:false});assert.equal((await legacy.worker.runAutomation()).status,'skipped');assert.equal(legacy.stats().generated,0);
 });

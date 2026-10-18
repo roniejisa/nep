@@ -12,7 +12,7 @@ export function automationSettings(value:Record<string,unknown>){
  const schedule_times=schedule_mode==='times'?scheduleTimes(value.schedule_times):[];
  const formats=reelSettings({...value,schedule_times});
  if((formats.format_mode==='reel'||Object.values(formats.slot_formats).includes('reel'))&&channels.every(c=>c==='threads'))throw new Error('Reel cần Facebook hoặc Instagram; Threads không hỗ trợ Reel.');
- return {...formats,schedule_mode,schedule_times,...selectionSettings(value),morning_start,morning_end,evening_start,evening_end,enabled:value.enabled,channels,provider:String(value.provider),model,copy_length:String(value.copy_length),daily_limit:24};
+ return {...formats,schedule_mode,schedule_times,...selectionSettings(value),morning_start,morning_end,evening_start,evening_end,enabled:value.enabled,channels,provider:String(value.provider),model,copy_length:String(value.copy_length)};
 }
 export function pickRandom<T>(values:T[],random:()=>number=Math.random):T{if(!values.length)throw new Error('Không có lựa chọn phù hợp.');return values[Math.min(values.length-1,Math.floor(random()*values.length))];}
 
@@ -36,16 +36,29 @@ export function productMatches(p:{id:string;category?:string},cfg:ReturnType<typ
 export function imageChoices<T>(images:T[],maximum:number,random:()=>number=Math.random):T[]{const remaining=[...images],chosen:T[]=[];while(remaining.length&&chosen.length<maximum){const i=Math.floor(random()*remaining.length);chosen.push(remaining.splice(i,1)[0]);}return chosen;}
 
 export const schedulePresets:Record<string,string[]>={
+ '48':Array.from({length:48},(_,i)=>`${String(Math.floor(i/2)).padStart(2,'0')}:${i%2?'30':'00'}`),
+ '96':Array.from({length:96},(_,i)=>`${String(Math.floor(i/4)).padStart(2,'0')}:${String(i%4*15).padStart(2,'0')}`),
  '6':['07:00','10:00','13:00','16:00','19:00','22:00'],
  '8':['07:00','09:00','11:00','14:00','17:00','19:00','21:00','23:00'],
  '12':Array.from({length:12},(_,i)=>`${String(i*2).padStart(2,'0')}:00`),
  '10':['06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','21:30','23:00']
 };
 export function scheduleTimes(input:unknown):string[]{
- if(!Array.isArray(input)||input.length<1||input.length>24||input.some(t=>typeof t!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t))||new Set(input).size!==input.length)throw new Error('Chọn 1–24 giờ hợp lệ, không trùng nhau.');
- const sorted=[...input].sort() as string[],minutes=sorted.map(t=>Number(t.slice(0,2))*60+Number(t.slice(3)));
- if(minutes.some((v,i)=>i>0&&v-minutes[i-1]<15)||minutes.length>1&&1440-minutes.at(-1)!+minutes[0]<15)throw new Error('Hai giờ đăng cần cách nhau ít nhất 15 phút, kể cả qua nửa đêm.');
- return sorted;
+ if(!Array.isArray(input)||!input.length||input.some(t=>typeof t!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t))||new Set(input).size!==input.length)throw new Error('Chọn các mốc HH:MM hợp lệ, không trùng nhau.');
+ return [...input].sort() as string[];
+}
+export function intervalTimes(start:string,end:string,every:number):string[]{
+ const valid=(time:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+ if(!valid(start)||!valid(end)||!Number.isInteger(every)||every<1||every>1440)throw new Error('Nhập giờ bắt đầu, kết thúc và khoảng cách 1–1.440 phút.');
+ const minute=(time:string)=>Number(time.slice(0,2))*60+Number(time.slice(3)),first=minute(start);let last=minute(end);
+ if(last<first)last+=1440;
+ const times:string[]=[];
+ for(let value=first;value<=last;value+=every){const m=value%1440;times.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);}
+ return scheduleTimes(times);
+}
+export function pastedTimes(text:string):string[]{
+ const times=text.trim().split(/[\s,;]+/).filter(Boolean).map(time=>/^\d:[0-5]\d$/.test(time)?'0'+time:time);
+ return scheduleTimes([...new Set(times)]);
 }
 export function legacyTimes(value:Record<string,unknown>):string[]{
  const w=postingWindow(value),times:string[]=[];
