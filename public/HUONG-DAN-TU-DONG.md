@@ -35,7 +35,7 @@ Cron kiểm tra mỗi phút, chỉ nhận mốc vừa đến trong cửa sổ 5 
 ## Nội dung mặc định và thử lại AI
 
 - Tự động mặc định: **Gemini `gemini-3.5-flash-lite`**, **Siêu ngắn**, chạm đúng **một phiền toái cụ thể trong sinh hoạt** ngay câu mở đầu. Không mở đầu chung chung, không bịa trải nghiệm, công dụng, giá hoặc giảm giá. Vẫn có thể đổi provider/model/độ dài trong nhóm AI viết bài.
-- Phần AI viết tối đa 150 ký tự Facebook, 120 Threads, 180 Instagram; câu đầu tối đa 70 ký tự, không quá 3 dòng. Hệ thống thêm thông báo hoa hồng và CTA riêng; Facebook gửi link ở bình luận, Instagram dẫn lên Bio, Threads giữ link cuối bài.
+- Phần AI viết tối đa 150 ký tự Facebook, 120 Threads, 180 Instagram; câu đầu tối đa 70 ký tự, không quá 3 dòng. Từ 2.10.2, hệ thống thêm CTA riêng; Facebook gửi link ở bình luận, Instagram dẫn lên Bio, Threads giữ link cuối bài.
 - AI lỗi HTTP/mạng/JSON hoặc bài không đạt kiểm tra: tối đa **5 lần gọi tổng cộng** (lần đầu + tối đa 4 lần thử lại), chờ tăng dần 10–60 giây với lỗi tạm thời, tôn trọng Retry-After. Mỗi yêu cầu AI chờ tối đa 60 giây và dừng ngay khi thành công. Bài dài chỉ sửa một lần.
 - Giữ nguyên provider/model ở mọi lần thử. Một chuỗi thử lại giữ một khóa AI; chỉ lưu một bộ bản nháp sau khi thành công. Không gọi lại AI để thử sửa lỗi lưu database.
 - Có ngân sách thời gian tổng cho cron 300 giây, kiểm tra trước lần thử tiếp theo và trước khi đăng. Nếu không đủ thời gian, có thể dừng sớm hơn 5 lần. Không thử vô hạn.

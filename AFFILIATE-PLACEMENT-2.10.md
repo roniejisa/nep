@@ -5,10 +5,10 @@
 | Kênh | Nội dung công khai | Link mua |
 | --- | --- | --- |
 | Facebook | Không URL; kết thúc bằng “Link săn deal mình ghim ở bình luận đầu tiên nha 👇” | Server gửi bình luận sau khi lưu mã bài đã đăng |
-| Instagram | Không URL; kết thúc bằng “Link mua chính hãng ở trên Bio mình nhé 🛒” | Bạn đặt trong Bio, có thể dùng trang tổng hợp sản phẩm |
+| Instagram | Không URL; kết thúc bằng “Link sản phẩm mình để trên Bio nha 🛒” | Bạn đặt trong Bio, có thể dùng trang tổng hợp sản phẩm |
 | Threads | Nội dung + thông báo hoa hồng + link gốc | Cuối bài, giữ nguyên mã affiliate |
 
-Thông báo hoa hồng vẫn có trong bài trên cả ba kênh và trong bình luận Facebook. Đây là lựa chọn phân phối nội dung, không phải cam kết thuật toán sẽ tăng reach.
+Từ 2.10.2, nội dung/bình luận dùng CTA ngắn dẫn đến link sản phẩm, không tự thêm câu thông báo hoa hồng. Đây là lựa chọn phân phối nội dung, không phải cam kết thuật toán sẽ tăng reach.
 
 ## Nâng cấp từ 2.9.1
 
@@ -17,7 +17,7 @@ Thông báo hoa hồng vẫn có trong bài trên cả ba kênh và trong bình 
 3. Deploy source 2.10.0 lên Vercel như các bản trước. Không cần đổi CRON_SECRET, Vault hoặc cài lại cron.
 4. Trong Meta App, bổ sung quyền `pages_manage_engagement` cho luồng Facebook. Nếu dùng Facebook Login for Business với `FACEBOOK_LOGIN_CONFIG_ID`, phải thêm quyền vào đúng configuration; source không thể thay scope của configuration từ trình duyệt. Với người dùng ngoài vai trò app, quyền cần mức truy cập/App Review theo yêu cầu Meta.
 5. Vào Thiết lập → Facebook → Kết nối lại, cấp quyền mới rồi chọn đúng Fanpage. Token cũ không tự có quyền chỉ vì đã deploy. Nếu dùng Page token nhập bằng biến môi trường, tạo lại token có quyền này rồi cập nhật Vercel và redeploy. Không gửi token qua chat.
-6. Đặt link mua hoặc một trang tổng hợp các sản phẩm vào phần liên kết của Bio Instagram. CTA “chính hãng” chỉ nên dùng với nguồn hàng bạn đã xác minh. Không đặt URL trang quản trị riêng tư làm trang mua hàng.
+6. Đặt link mua hoặc một trang tổng hợp các sản phẩm vào phần liên kết của Bio Instagram. Không đặt URL trang quản trị riêng tư làm trang mua hàng.
 7. Mở lại Nội dung AI: bản nháp cũ sẽ được hiển thị theo vị trí link mới; kiểm tra, lưu/duyệt một bài rồi thử đăng. Bài đã xuất bản trước đây giữ nguyên, không bị sửa hay bình luận bổ sung hàng loạt.
 8. Sau khi thử thành công, bật và lưu lại lịch. Thời gian, sản phẩm và kênh đã chọn vẫn giữ nguyên.
 

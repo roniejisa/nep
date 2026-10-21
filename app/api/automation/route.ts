@@ -1,4 +1,4 @@
-import {authorize,failure,readBody} from '@/lib/content-server';
+import {authorize,failure} from '@/lib/content-server';
 import {automationSettings} from '@/lib/automation-rules';
 import {automationTarget} from '@/lib/automation';
 import {configuredProviders} from '@/lib/ai-provider';
@@ -13,10 +13,10 @@ export async function GET(request:Request){try{
  if(settingsResult.error||jobsResult.error||errorsResult.error)throw new Error('Chưa đọc được dữ liệu tự động hóa. Kiểm tra các migration trong hướng dẫn nâng cấp.');
  return Response.json({settings:settingsResult.data,jobs:jobsResult.data,errors:errorsResult.data,jobsTotal:jobsResult.count,errorsTotal:errorsResult.count,pageSize:size,cronConfigured:(process.env.CRON_SECRET?.trim().length||0)>=32},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return failure(e);}}
-export async function POST(request:Request){try{const {db,user}=await authorize(request);const input=await readBody(request);
+export async function POST(request:Request){try{const {db,user}=await authorize(request);if(Number(request.headers.get('content-length'))>150000)throw new Error('Yêu cầu cấu hình quá dài.');const raw=await request.text();if(Buffer.byteLength(raw)>150000)throw new Error('Yêu cầu cấu hình quá dài.');const input=JSON.parse(raw);if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Cấu hình không hợp lệ.');
  if(input.action==='pause'){const {error}=await db.from('affiliate_automation_settings').update({enabled:false,updated_at:new Date().toISOString()}).eq('owner_id',user.id);if(error)throw new Error('Không tắt được lịch.');return Response.json({paused:true});}
  const cfg=automationSettings(input),targets:Record<string,string>={};
  if(cfg.selection_mode==='products'){const {data,error}=await db.from('affiliate_products').select('id').eq('owner_id',user.id).in('id',cfg.selected_products);if(error||data?.length!==cfg.selected_products.length)throw new Error('Có sản phẩm đã bị xóa hoặc không thuộc tài khoản.');}
  if(cfg.enabled){if(input.autoPublishConsent!==true)throw new Error('Xác nhận cho phép tự đăng trước khi lưu.');if((process.env.CRON_SECRET?.trim().length||0)<32)throw new Error('Thiếu CRON_SECRET trên Vercel.');if(!configuredProviders()[cfg.provider as keyof ReturnType<typeof configuredProviders>])throw new Error('Chưa có khóa AI đã chọn.');for(const channel of cfg.channels.filter(c=>c!=='threads'||cfg.format_mode!=='reel'||Object.values(cfg.slot_formats).includes('feed'))){const target=await automationTarget(db,user.id,channel);targets[channel]=target.id;}}
- const {error}=await db.from('affiliate_automation_settings').upsert({...cfg,targets,owner_id:user.id,updated_at:new Date().toISOString()});if(error)throw new Error('Không lưu được lịch. Chạy reels.sql sau automation-unrestricted.sql và các migration trước đó.');return Response.json({saved:true});
+ const {error}=await db.from('affiliate_automation_settings').upsert({...cfg,targets,owner_id:user.id,updated_at:new Date().toISOString()});if(error)throw new Error(error.code==='23514'?'Chưa lưu được lịch do ràng buộc dữ liệu cũ. Chạy automation-dense-schedule.sql để bỏ trần 24 mốc và khoảng cách 15 phút; kiểm tra các trường cấu hình nếu vẫn lỗi.':'Không lưu được lịch. Kiểm tra migration reels.sql và automation-dense-schedule.sql sau các migration trước đó.');return Response.json({saved:true});
  }catch(e){return failure(e);}}

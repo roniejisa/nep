@@ -9,7 +9,7 @@ export function readableError(error: unknown): string {
   const code = value.code ?? (value.statusCode ? String(value.statusCode) : '');
   let explanation = '';
   if (code === 'PGRST205' || code === '42P01') explanation = 'Chưa có bảng dữ liệu. Mở Thiết lập và chạy script SQL trong Supabase.';
-  else if (code === '23505') explanation = 'Link affiliate này đã có trong danh mục của bạn.';
+  else if (code === '23505') explanation = 'Mã sản phẩm hoặc link affiliate này đã có trong danh mục. Mở sản phẩm hiện có để chỉnh sửa.';
   else if (raw.includes('Invalid login credentials')) explanation = 'Email hoặc mật khẩu chưa đúng. Dùng tài khoản tạo trong Supabase Authentication.';
   else if (raw.includes('Email not confirmed')) explanation = 'Email tài khoản chưa được xác nhận trong Supabase.';
   else if (raw.includes('permission denied for schema')) explanation = 'Tài khoản đang thiếu quyền truy cập schema cơ sở dữ liệu.';

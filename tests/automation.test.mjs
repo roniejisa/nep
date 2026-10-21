@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import {readyIssues} from '../lib/product-readiness.ts';
+import {automationFailureSummary,automationFailureContext} from '../lib/automation-outcome.ts';
+import {explainError,OperationError} from '../lib/operation-error.ts';
 import {AIError,isRecoverableAIError} from '../lib/ai-provider.ts';
 import {test} from 'node:test';
 import {readFile} from 'node:fs/promises';
@@ -12,7 +15,7 @@ const compiled=ts.transpileModule(reelRules+'\n'+rules+'\n'+source.replace(/^imp
 const {automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,scheduleTimes,schedulePresets,slotFormats}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 test('automation rejects invalid channels, models and explicit state; random choice stays in pool',()=>{
  const cfg={enabled:true,channels:['threads'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24};
- assert.equal(automationSettings(cfg).daily_limit,24);
+ assert.equal('daily_limit' in automationSettings(cfg),false);
  for(const update of [{enabled:'true'},{channels:[]},{channels:['facebook','facebook']},{provider:'unknown'},{model:'../../secret'},{copy_length:'long'}])assert.throws(()=>automationSettings({...cfg,...update}));
  assert.equal(pickRandom(['a','b'],()=>0),'a');assert.equal(pickRandom(['a','b'],()=>.9999),'b');assert.throws(()=>pickRandom([]));
 });
@@ -33,38 +36,38 @@ test('database claim is idempotent, respects off switch and daily cap, and denie
  await db.exec('set role authenticated');await assert.rejects(claim());await assert.rejects(db.query('select * from affiliate_automation_settings'));await db.exec('reset role');
  }finally{await db.close();}
 });
-async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false,cfgOverride={},imagesOverride=[],videosOverride=[],generationError=null,interruptedBeforePublish=false,commentWarning=''}={}){
- let generated=0,published=0,paused=false;const logs=[],generationRequests=[];
+async function workerFixture({target='123',afterGeneration=false,interrupted=false,publishError=false,tokenError=false,cfgOverride={},imagesOverride=[],videosOverride=[],generationError=null,interruptedBeforePublish=false,commentWarning='',clientDue=true,dbFailure=null,rpcFailure=null,interruptedStatus='unknown',exerciseRetries=false}={}){
+ let generated=0,published=0,paused=false,claims=0,oldClosed=false,oldStatus=interruptedStatus;const logs=[],generationRequests=[],publishedIds=[];
  const cfg={enabled:true,channels:['facebook'],provider:'gemini',model:'',copy_length:'tiny',daily_limit:24,targets:{facebook:'123'},updated_at:'version1',...cfgOverride};
- const db={rpc:async(name)=>({data:name==='eligible_affiliate_products'?['product1']:name==='claim_affiliate_automation'?'job1':null,error:null}),from(table){let action='select',payload,columns='';const chain=new Proxy({},{get(_,prop){if(prop==='then')return resolve=>{
+ const db={rpc:async(name)=>({data:name==='eligible_affiliate_products'?['product1']:name==='claim_affiliate_automation'?`job${++claims}`:null,error:rpcFailure===name?{code:'test-rpc-error'}:null}),from(table){let action='select',payload,columns='';const filters={};const chain=new Proxy({},{get(_,prop){if(prop==='then')return (resolve,reject)=>{
  let data=null;
  if(action==='select'){
  if(table==='affiliate_automation_settings')data=afterGeneration&&generated?{...cfg,enabled:false}:cfg;
  if(table==='affiliate_products')data=[{id:'product1',name:'Daily product',description:'Verified facts',affiliate_url:'https://example.com/link'}];
  if(table==='affiliate_product_images')data=imagesOverride;
  if(table==='affiliate_product_videos')data=videosOverride;
- if(table==='affiliate_content_posts')data=[{id:'unknownpost',status:'unknown'}];
- if(table==='affiliate_automation_jobs')data=columns==='slot'?{slot:'2026-10-16T08:00:00+07:00'}:columns==='id,post_id'&&(interrupted||interruptedBeforePublish)?[{id:'oldjob',post_id:interrupted?'unknownpost':null}]:[];
- }else{logs.push({table,payload});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
- return Promise.resolve({data,error:null}).then(resolve);
- };return (...args)=>{if(['select','update'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
- const deps={AIError,isRecoverableAIError,database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;if(generationError)throw generationError;return {posts:[{id:'post1',body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;if(publishError)throw new Error('Meta result uncertain');return {warning:commentWarning};},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,slotFormats,assertPublishingQuota:async()=>{},scheduledDue:()=>true,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw new Error('Token invalid');return {id:'123'};},explainError:(e,stage)=>({kind:'unknown',stage,message:e.message,advice:'Check'}),configuredProviders:()=>({gemini:true})};
+ if(table==='affiliate_content_posts')data=[{id:'unknownpost',status:oldStatus}];
+ if(table==='affiliate_automation_jobs')data=columns==='slot'?{slot:'2026-10-16T08:00:00+07:00'}:columns==='id,post_id,channel'&&!oldClosed&&(interrupted||interruptedBeforePublish)?[{id:'oldjob',post_id:interrupted?'unknownpost':null,channel:'threads'}]:[];
+ }else{logs.push({table,payload,filters:{...filters}});if(table==='affiliate_automation_settings'&&payload.enabled===false)paused=true;}
+ const injected=dbFailure?.({table,action,payload,columns,filters});if(!injected&&action==='update'){if(table==='affiliate_automation_jobs'&&filters.id==='oldjob'&&payload.status)oldClosed=true;if(table==='affiliate_content_posts'&&filters.id==='unknownpost'&&payload.status)oldStatus=payload.status;}if(injected==='throw')return Promise.reject(new Error('transport unavailable')).then(resolve,reject);return Promise.resolve({data,error:injected?{code:'test-query-error'}:null}).then(resolve,reject);
+ };return (...args)=>{if(prop==='eq')filters[args[0]]=args[1];if(['select','update','insert'].includes(prop)){action=prop;if(prop==='select')columns=args[0];else payload=args[0];}return chain;};}});return chain;}};
+ const deps={readyIssues,automationFailureSummary,automationFailureContext,AIError,isRecoverableAIError,database:()=>db,env:()=> 'owner1',generateContent:async(_db,_owner,input,retry)=>{generationRequests.push({input,retry});generated++;if(exerciseRetries)await retry.onFailure(new AIError('503',{reason:'http',httpStatus:503,retryable:true}),1,true,{reason:'http',delayMs:10000});if(generationError)throw generationError;return {posts:[{id:`post${generated}`,body:'checked copy',image_id:null}]};},publishContent:async(_db,_owner,input)=>{assert.equal(input.expectedTargetId,'123');assert.equal(input.approved,true);published++;publishedIds.push(input.postId);if(publishError)throw publishError instanceof Error?publishError:new Error('Meta result uncertain');return {warning:commentWarning};},socialTarget:async()=>({id:target}),instagramTarget:async()=>({id:target}),automationSettings,pickRandom,productMatches,imageChoices,slotFormats,assertPublishingQuota:async()=>{},scheduledDue:()=>clientDue,postingWindow:()=>({period:'morning'}),metaRequest:async()=>{if(tokenError)throw tokenError instanceof Error?tokenError:new OperationError('Token invalid','token',400,190,463);return {id:'123'};},explainError,configuredProviders:()=>({gemini:true})};
  globalThis.__automationDeps=deps;
  let src=await readFile(new URL('../lib/automation.ts',import.meta.url),'utf8');
  src=src.replace(/^import (?!.*node:crypto).*\n/gm,'');
- src="const {AIError,isRecoverableAIError,database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders,assertPublishingQuota,slotFormats}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
+ src="const {readyIssues,automationFailureSummary,automationFailureContext,AIError,isRecoverableAIError,database,env,generateContent,publishContent,socialTarget,instagramTarget,automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue,metaRequest,explainError,configuredProviders,assertPublishingQuota,slotFormats}=globalThis.__automationDeps;\n"+src+'\n//'+Math.random();
  const code=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const worker=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
- return {worker,stats:()=>({generated,published,paused,logs,generationRequests})};
+ return {worker,setGenerationError:value=>generationError=value,setTokenError:value=>tokenError=value,setEnabled:value=>cfg.enabled=value,stats:()=>({generated,published,paused,logs,generationRequests,publishedIds,oldClosed,oldStatus,claims})};
 }
 test('hourly worker generates once and publishes only to the consented target',async()=>{
  const f=await workerFixture();assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().generated,1);assert.equal(f.stats().published,1);assert.equal(f.stats().paused,false);const request=f.stats().generationRequests[0];assert.equal(request.input.angle,'problem');assert.equal(request.input.length,'tiny');assert.equal(request.retry.maxAttempts,5);assert.equal(request.retry.delayMs,10000);assert.equal(request.retry.requestTimeoutMs,60000);assert.equal(request.retry.backoff,true);assert.equal(typeof request.retry.beforeAttempt,'function');
 });
 test('target changes, cancellation, interruptions and uncertain Meta errors prevent silent retries',async()=>{
  for(const [options,expectedGenerated,expectedPublished,expectedStatus] of [
- [{target:'999'},0,0,'failed'],[{tokenError:true},0,0,'failed'],[{afterGeneration:true},1,0,'skipped'],[{interrupted:true},0,0,'failed'],[{publishError:true},1,1,'failed']
+ [{target:'999'},0,0,'skipped'],[{tokenError:true},0,0,'skipped'],[{afterGeneration:true},1,0,'skipped'],[{interrupted:true},1,1,'done'],[{publishError:true},1,1,'skipped']
  ]){
- const f=await workerFixture(options);assert.equal((await f.worker.runAutomation()).status,expectedStatus);assert.equal(f.stats().generated,expectedGenerated);assert.equal(f.stats().published,expectedPublished);assert.equal(f.stats().paused,expectedStatus==='failed');
+ const f=await workerFixture(options);assert.equal((await f.worker.runAutomation()).status,expectedStatus);assert.equal(f.stats().generated,expectedGenerated);assert.equal(f.stats().published,expectedPublished);assert.equal(f.stats().paused,false);
  }
 });
 test('cron rejects missing, short and incorrect secrets',async()=>{
@@ -122,9 +125,9 @@ test('no image automatically removes Instagram from the random candidate pool',a
  const filtered=await workerFixture({cfgOverride:{selection_mode:'categories',selected_categories:['Not this category']}});assert.equal((await filtered.worker.runAutomation()).status,'skipped');assert.equal(filtered.stats().generated,0);
 });
 
-test('explicit schedules support 6/8/10 slots, reject duplicates/close times and only become due within grace',()=>{
+test('explicit schedules retain presets, reject invalid/duplicate times and expose the legacy client grace helper',()=>{
  for(const count of ['6','8','10'])assert.equal(scheduleTimes(schedulePresets[count]).length,Number(count));
- for(const times of [[],['24:00'],['7:00'],['07:00','07:00'],['07:00','07:10'],['23:55','00:05']])assert.throws(()=>scheduleTimes(times));
+ for(const times of [[],['24:00'],['7:00'],['07:00','07:00']])assert.throws(()=>scheduleTimes(times));
  const cfg={schedule_mode:'times',schedule_times:['07:00','09:00','14:00']};
  assert.equal(scheduledDue(cfg,new Date('2026-10-16T06:59:00+07:00')),false);
  assert.equal(scheduledDue(cfg,new Date('2026-10-16T07:04:00+07:00')),true);
@@ -143,11 +146,11 @@ test('automation honors Reel-only, mixed availability and per-slot overrides usi
  const overridden=await workerFixture({cfgOverride:{format_mode:'feed',schedule_mode:'times',schedule_times:['08:00','10:00'],slot_formats:{'08:00':'reel'}},videosOverride:[video]});assert.equal((await overridden.worker.runAutomation()).status,'done');assert.equal(overridden.stats().generationRequests[0].input.postFormat,'reel');
 });
 
-test('recoverable AI failures skip only the current slot, while bad credentials and unknown Meta results still pause',async()=>{
+test('all AI failures skip only the current slot, including bad credentials, without disabling the schedule',async()=>{
  for(const error of [new AIError('503 overloaded',{reason:'http',httpStatus:503,retryable:true}),new AIError('timeout',{reason:'timeout',retryable:true}),new AIError('length repair failed',{reason:'validation',retryable:true})]){
-  const f=await workerFixture({generationError:error});const result=await f.worker.runAutomation();assert.equal(result.status,'skipped');assert.ok(result.message.includes('Lịch vẫn bật'));assert.equal(f.stats().paused,false);assert.equal(f.stats().generated,1);assert.equal(f.stats().published,0);
+  const f=await workerFixture({generationError:error});const result=await f.worker.runAutomation();assert.equal(result.status,'skipped');assert.ok(result.message.includes('Lịch không bị tự tắt'));assert.equal(f.stats().paused,false);assert.equal(f.stats().generated,1);assert.equal(f.stats().published,0);
  }
- const permanent=await workerFixture({generationError:new AIError('AI 401',{reason:'http',httpStatus:401,retryable:false})});assert.equal((await permanent.worker.runAutomation()).status,'failed');assert.equal(permanent.stats().paused,true);
+ const permanent=await workerFixture({generationError:new AIError('AI 401',{reason:'http',httpStatus:401,retryable:false})});assert.equal((await permanent.worker.runAutomation()).status,'skipped');assert.equal(permanent.stats().paused,false);
  const interrupted=await workerFixture({interruptedBeforePublish:true});assert.equal((await interrupted.worker.runAutomation()).status,'done');assert.equal(interrupted.stats().paused,false);
  const cancelled=await workerFixture({generationError:new AIError('cancelled',{reason:'cancelled',retryable:true})});assert.equal((await cancelled.worker.runAutomation()).status,'skipped');assert.equal(cancelled.stats().published,0);assert.equal(cancelled.stats().paused,false);
 });
@@ -155,4 +158,48 @@ test('recoverable AI failures skip only the current slot, while bad credentials 
 test('comment failure is visible in cron history without republishing or pausing the schedule',async()=>{
  const f=await workerFixture({commentWarning:'Bài đã đăng. Chưa gửi được bình luận; kiểm tra quyền.'});
  const result=await f.worker.runAutomation();assert.equal(result.status,'done');assert.match(result.message,/Chưa gửi được bình luận/);assert.equal(f.stats().paused,false);assert.equal(f.stats().published,1);
+});
+
+test('minute-slot cron uses the database claim for delayed slots while legacy windows keep their client check',async()=>{
+ const dense=await workerFixture({clientDue:false,cfgOverride:{schedule_mode:'times',schedule_times:['00:00','00:01']}});
+ assert.equal((await dense.worker.runAutomation()).status,'done');assert.equal(dense.stats().generated,1);
+ const legacy=await workerFixture({clientDue:false});assert.equal((await legacy.worker.runAutomation()).status,'skipped');assert.equal(legacy.stats().generated,0);
+});
+
+test('a failed AI slot does not disable or poison the next scheduled run',async()=>{
+ const f=await workerFixture({generationError:new AIError('401 rejected',{reason:'http',httpStatus:401,retryable:false})});
+ const failed=await f.worker.runAutomation();assert.equal(failed.status,'skipped');assert.match(failed.message,/Lịch không bị tự tắt/);assert.equal(f.stats().published,0);
+ f.setGenerationError(null);assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().claims,2);assert.deepEqual(f.stats().publishedIds,['post2']);assert.equal(f.stats().paused,false);
+ assert.ok(!f.stats().logs.some(l=>l.table==='affiliate_automation_settings'&&l.payload?.enabled!==undefined));
+});
+test('token, permission, quota and network failures skip before AI; healthy later slots continue',async()=>{
+ for(const [kind,status,code] of [['token',400,190],['permission',403,200],['rate_limit',429,613],['network',null,null]]){
+  const f=await workerFixture({tokenError:new OperationError('provider failure',kind,status,code,463)});const result=await f.worker.runAutomation();
+  assert.equal(result.status,'skipped');assert.equal(f.stats().generated,0);assert.equal(f.stats().published,0);assert.equal(f.stats().paused,false);
+  const row=f.stats().logs.find(l=>l.table==='affiliate_automation_errors')?.payload;assert.equal(row.kind,kind);assert.equal(row.error_code,code);assert.equal(row.stage,'token_check');
+  f.setTokenError(false);assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().published,1);
+ }
+});
+test('an interrupted publishing post is quarantined once; future runs publish fresh posts instead of replaying it',async()=>{
+ const f=await workerFixture({interrupted:true,interruptedStatus:'publishing'});
+ assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().oldClosed,true);assert.equal(f.stats().oldStatus,'unknown');
+ assert.equal((await f.worker.runAutomation()).status,'done');assert.deepEqual(f.stats().publishedIds,['post1','post2']);assert.equal(f.stats().paused,false);
+ const quarantine=f.stats().logs.filter(l=>l.table==='affiliate_content_posts');assert.equal(quarantine.length,1);assert.equal(quarantine[0].payload.status,'unknown');assert.equal(quarantine[0].filters.status,'publishing');assert.equal(quarantine[0].filters.owner_id,'owner1');
+ const warning=f.stats().logs.find(l=>l.table==='affiliate_automation_errors'&&l.payload.stage==='recovery');assert.equal(warning.payload.channel,'threads');assert.equal(warning.payload.job_id,'oldjob');
+});
+test('cleanup and retry telemetry errors never turn off the schedule or stop a healthy generation',async()=>{
+ const cleanup=await workerFixture({rpcFailure:'cleanup_affiliate_automation'});assert.equal((await cleanup.worker.runAutomation()).status,'done');assert.equal(cleanup.stats().paused,false);
+ const f=await workerFixture({exerciseRetries:true,dbFailure:({table,action,payload})=>table==='affiliate_automation_errors'&&action==='insert'?'throw':table==='affiliate_automation_jobs'&&payload?.message?.startsWith('AI lần')?true:false});
+ assert.equal((await f.worker.runAutomation()).status,'done');assert.equal(f.stats().published,1);assert.equal(f.stats().paused,false);
+});
+test('failure to write the final job status never sends a successful post twice or disables the schedule',async()=>{
+ const f=await workerFixture({dbFailure:({table,payload})=>table==='affiliate_automation_jobs'&&payload?.finished_at?true:false});
+ const result=await f.worker.runAutomation();assert.equal(result.status,'done');assert.equal(result.historySaved,false);assert.equal(f.stats().published,1);assert.equal(f.stats().paused,false);
+});
+test('pre-claim database errors are recorded as skipped without creating or disabling a job',async()=>{
+ const f=await workerFixture({rpcFailure:'claim_affiliate_automation'});const result=await f.worker.runAutomation();assert.equal(result.status,'skipped');assert.equal(f.stats().generated,0);assert.equal(f.stats().paused,false);
+ const row=f.stats().logs.find(l=>l.table==='affiliate_automation_errors').payload;assert.equal(row.job_id,null);assert.equal(row.stage,'database');
+});
+test('manual off remains off and auto-run cannot bypass the user consent checks',async()=>{
+ const f=await workerFixture();f.setEnabled(false);assert.equal((await f.worker.runAutomation()).status,'skipped');assert.equal(f.stats().generated,0);assert.equal(f.stats().claims,0);assert.ok(!f.stats().logs.some(l=>l.table==='affiliate_automation_settings'));
 });

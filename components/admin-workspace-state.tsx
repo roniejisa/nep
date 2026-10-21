@@ -8,6 +8,7 @@ import {supabase,BUCKET,categories as defaultCategories,readableError,operationE
 
 import {VIDEO_BUCKET} from '@/lib/reel-rules';
 import {paginate} from '@/lib/pagination';
+import {isPublishReady,readyIssues,sourceDescription} from '@/lib/product-readiness';
 
 import {defaultSettings,type SiteSettings} from '@/lib/site-settings';
 
@@ -34,9 +35,10 @@ export function useAdminWorkspace(){
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Tất cả');
   const [status, setStatus] = useState('all');
+  const [mediaFilter,setMediaFilter]=useState('all');
   const [sort, setSort] = useState('newest');
   const [productPage,setProductPage]=useState(1),[imagePage,setImagePage]=useState(1),[imageQuery,setImageQuery]=useState('');
-  useEffect(()=>setProductPage(1),[query,category,status,sort]);
+  useEffect(()=>setProductPage(1),[query,category,status,sort,mediaFilter]);
   useEffect(()=>setImagePage(1),[imageQuery]);
   const [display, setDisplay] = useState<'grid' | 'list'>('grid');
   const [authOpen, setAuthOpen] = useState(false);
@@ -124,7 +126,10 @@ export function useAdminWorkspace(){
     const affiliate = safeHttpUrl(editor.affiliate_url.trim());
     if (!affiliate || !affiliate.startsWith('https:')) { setFormError('Link affiliate phải là đường dẫn HTTPS hợp lệ.'); return; }
     if (editor.source_url && !safeHttpUrl(editor.source_url)) { setFormError('Link nguồn chưa hợp lệ.'); return; }
-    if (editor.status === 'ready' && !editor.description.trim()) { setFormError('Bổ sung mô tả gốc trước khi chuyển sang Sẵn sàng.'); return; }
+    if(editor.status==='ready'){
+      if(!editor.verified_at){setFormError('Xác nhận đã kiểm tra thông tin nguồn để sản phẩm thực sự sẵn sàng tự đăng.');return;}
+      const issues=readyIssues(editor,true);if(issues.length){setFormError(issues.join(' · '));return;}
+    }
     setSaving(true); setFormError('');
     const completed: string[] = [];
     let savedProductId = editor.id;
@@ -134,7 +139,7 @@ export function useAdminWorkspace(){
       if (authData.user.id !== user.id) throw operationError('Kiểm tra chủ sở hữu', new Error('Tài khoản đã thay đổi trong lúc chỉnh sửa. Đóng form và mở lại sản phẩm bằng tài khoản hiện tại.'));
       const ownerId = authData.user.id;
       // Update editable fields only. Never rewrite the existing record's ID or owner.
-      const payload = { name: editor.name.trim(), category: editor.category.trim(), description: editor.description, affiliate_url: editor.affiliate_url.trim(), source_url: editor.source_url.trim(), shop_name: editor.shop_name, variant: editor.variant, price: editor.price === '' ? null : Number(editor.price), commission_rate: editor.commission_rate === '' ? null : Number(editor.commission_rate), status: editor.status, notes: editor.notes, verified_at: editor.verified_at };
+      const payload = { name: editor.name.trim(), category: editor.category.trim(), description: editor.status==='ready'&&!editor.description.trim()?sourceDescription(editor):editor.description, affiliate_url: editor.affiliate_url.trim(), source_url: editor.source_url.trim(), shop_name: editor.shop_name, variant: editor.variant, price: editor.price === '' ? null : Number(editor.price), commission_rate: editor.commission_rate === '' ? null : Number(editor.commission_rate), status: editor.status, notes: editor.notes, verified_at: editor.verified_at };
       if (!payload.name) throw new Error('Vui lòng nhập tên sản phẩm.');
       const { data, error } = editor.id
         ? await supabase.from('affiliate_products').update(payload).eq('id', editor.id).eq('owner_id', ownerId).select().single()
@@ -222,13 +227,13 @@ export function useAdminWorkspace(){
   const totalSize = allImages.reduce((sum, i) => sum + i.size_bytes, 0);
   const originals = allImages.reduce((sum, i) => sum + i.original_bytes, 0);
   const savingPercent = originals ? Math.max(0, Math.round((1-totalSize/originals)*100)) : 0;
-  const filtered = products.filter(p => (category === 'Tất cả' || p.category === category) && (status === 'all' || p.status === status) && `${p.name} ${p.shop_name} ${p.description}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'))).sort((a,b) => sort === 'name' ? a.name.localeCompare(b.name, 'vi') : sort === 'oldest' ? a.updated_at.localeCompare(b.updated_at) : b.updated_at.localeCompare(a.updated_at));
+  const filtered = products.filter(p => (category === 'Tất cả' || p.category === category) && (status === 'all' || p.status === status) && (mediaFilter==='all'||mediaFilter==='missing'&&!p.product_images.length||mediaFilter==='has'&&p.product_images.length>0||mediaFilter==='incomplete'&&(!p.description.trim()||!p.verified_at)||mediaFilter==='publishable'&&isPublishReady(p)||mediaFilter==='not-ready'&&!isPublishReady(p)) && `${p.name} ${p.shop_name} ${p.description} ${p.external_product_id||''} ${p.external_shop_id||''}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'))).sort((a,b) => sort === 'name' ? a.name.localeCompare(b.name, 'vi') : sort === 'oldest' ? a.updated_at.localeCompare(b.updated_at) : b.updated_at.localeCompare(a.updated_at));
   const pendingBytes = pendingImages.reduce((sum,i) => sum+i.blob.size,0);
   const originalPending = pendingImages.reduce((sum,i) => sum+i.originalBytes,0);
 
   useEffect(()=>setProductPage(p=>Math.min(p,Math.max(1,Math.ceil(filtered.length/12)))),[filtered.length]);
   useEffect(()=>setImagePage(p=>Math.min(p,Math.max(1,Math.ceil(allImages.length/24)))),[allImages.length]);
   const productResults=paginate(filtered,productPage,12),imageResults=paginate(allImages.filter(img=>`${img.productName} ${img.original_name}`.toLocaleLowerCase('vi').includes(imageQuery.toLocaleLowerCase('vi'))),imagePage,24);
-  return {site,setSite,connectionsOpen,setConnectionsOpen,user,setUser,authLoaded,setAuthLoaded,products,setProducts,customCategories,setCustomCategories,categories,loading,setLoading,dbError,setDbError,notice,setNotice,query,setQuery,category,setCategory,status,setStatus,sort,setSort,productPage,setProductPage,imagePage,setImagePage,imageQuery,setImageQuery,display,setDisplay,authOpen,setAuthOpen,mobileNav,setMobileNav,editor,setEditor,existingImages,setExistingImages,pendingImages,setPendingImages,pendingRef,imagePreset,setImagePreset,converting,setConverting,saving,setSaving,importing,setImporting,formError,setFormError,dragging,setDragging,deleteTarget,setDeleteTarget,deleting,setDeleting,preview,setPreview,sql,setSql,sqlVisible,setSqlVisible,totalCount,setTotalCount,fileInput,currentUser,notify,loadProducts,navigate,closeEditor,openProduct,copy,addImages,saveProduct,deleteImage,setCover,removeProduct,importLinks,logout,exportData,allImages,totalSize,originals,savingPercent,filtered,pendingBytes,originalPending,productResults,imageResults,view};
+  return {site,setSite,connectionsOpen,setConnectionsOpen,user,setUser,authLoaded,setAuthLoaded,products,setProducts,customCategories,setCustomCategories,categories,loading,setLoading,dbError,setDbError,notice,setNotice,query,setQuery,category,setCategory,status,setStatus,mediaFilter,setMediaFilter,sort,setSort,productPage,setProductPage,imagePage,setImagePage,imageQuery,setImageQuery,display,setDisplay,authOpen,setAuthOpen,mobileNav,setMobileNav,editor,setEditor,existingImages,setExistingImages,pendingImages,setPendingImages,pendingRef,imagePreset,setImagePreset,converting,setConverting,saving,setSaving,importing,setImporting,formError,setFormError,dragging,setDragging,deleteTarget,setDeleteTarget,deleting,setDeleting,preview,setPreview,sql,setSql,sqlVisible,setSqlVisible,totalCount,setTotalCount,fileInput,currentUser,notify,loadProducts,navigate,closeEditor,openProduct,copy,addImages,saveProduct,deleteImage,setCover,removeProduct,importLinks,logout,exportData,allImages,totalSize,originals,savingPercent,filtered,pendingBytes,originalPending,productResults,imageResults,view};
 }
 export type AdminWorkspaceState=ReturnType<typeof useAdminWorkspace>;

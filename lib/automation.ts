@@ -1,3 +1,5 @@
+import {readyIssues} from '@/lib/product-readiness';
+import {automationFailureSummary,automationFailureContext} from '@/lib/automation-outcome';
 import {slotFormats} from './reel-rules';
 import {assertPublishingQuota} from './publishing-quota';
 import {randomInt,timingSafeEqual} from 'node:crypto';
@@ -7,7 +9,7 @@ import {publishContent} from './content-publish';
 import {socialTarget} from './social-connections';
 import {instagramTarget} from './instagram-connection';
 import {automationSettings,pickRandom,postingWindow,productMatches,imageChoices,scheduledDue} from './automation-rules';
-import {AIError,isRecoverableAIError,configuredProviders} from './ai-provider';
+import {AIError,configuredProviders} from './ai-provider';
 import {metaRequest,type SocialTarget} from './social-publish';
 import {explainError} from './operation-error';
 import type {Channel} from './content-rules';
@@ -15,39 +17,51 @@ export async function automationTarget(db:ReturnType<typeof database>,owner:stri
 export function cronAuthorized(header:string|null){const secret=process.env.CRON_SECRET?.trim();if(!secret||secret.length<32)return false;const a=Buffer.from(header||''),b=Buffer.from(`Bearer ${secret}`);return a.length===b.length&&timingSafeEqual(a,b);}
 export async function runAutomation(){
  const started=Date.now(),db=database(),owner=env('CONTENT_ADMIN_USER_ID');
- const {error:cleanupError}=await db.rpc('cleanup_affiliate_automation');if(cleanupError)throw new Error('Chạy automation-controls.sql để bật kiểm soát và dọn lỗi.');
- const {data:schedule,error:scheduleError}=await db.from('affiliate_automation_settings').select('*').eq('owner_id',owner).maybeSingle();if(scheduleError)throw new Error('Không đọc được cấu hình lịch.');
- if(!schedule?.enabled||!scheduledDue(schedule))return {status:'skipped',message:'Lịch tắt hoặc chưa đến giờ đã chọn.'};
- const {data:job,error:claimError}=await db.rpc('claim_affiliate_automation',{p_owner:owner});
- if(claimError)throw new Error('Chưa lấy được lượt chạy. Chạy automation.sql trước.');
- if(!job)return {status:'skipped',message:'Lịch tắt, khung giờ đã nhận hoặc một lượt khác đang chạy.'};
- let stage='database',channel:Channel|null=null;
- const finish=async(status:string,message:string)=>{const {error}=await db.from('affiliate_automation_jobs').update({status,message,finished_at:new Date().toISOString()}).eq('id',job);if(error)throw new Error('Không lưu được lịch sử tự động.');return {status,message};};
+ let job:string|null=null,stage='database',channel:Channel|null=null;
+ const telemetry=(event:string,detail?:ReturnType<typeof explainError>)=>console.error(event,{job_id:job,stage:detail?.stage||stage,kind:detail?.kind||'database',http_status:detail?.http_status??null,error_code:detail?.error_code??null,error_subcode:detail?.error_subcode??null});
+ const recordError=async(detail:ReturnType<typeof explainError>,jobId=job,errorChannel=channel)=>{try{const {error}=await db.from('affiliate_automation_errors').insert({owner_id:owner,job_id:jobId,channel:errorChannel,...detail}).abortSignal(AbortSignal.timeout(5000));if(error){telemetry('automation.error_log_unavailable',detail);return false;}return true;}catch{telemetry('automation.error_log_unavailable',detail);return false;}};
+ const finish=async(status:string,message:string)=>{
+  if(!job)return {status,message};
+  try{const {error}=await db.from('affiliate_automation_jobs').update({status,message,finished_at:new Date().toISOString()}).eq('id',job).eq('owner_id',owner).abortSignal(AbortSignal.timeout(5000));if(error)throw error;return {status,message,historySaved:true};}
+  catch{telemetry('automation.job_finish_unavailable');await recordError(explainError(new Error('Không lưu được trạng thái lượt chạy; không tự gửi lại bài đã gửi.'),'database'));return {status,message:message+' Chưa lưu được trạng thái lượt chạy; hệ thống sẽ đối chiếu lượt bị ngắt, không tự gửi lại bài cũ.',historySaved:false};}
+ };
  try{
+  try{const {error}=await db.rpc('cleanup_affiliate_automation');if(error)await recordError(explainError(new Error('Chưa dọn được nhật ký hết hạn; vẫn tiếp tục lượt chạy.'),'database'));}catch{await recordError(explainError(new Error('Dọn nhật ký bị gián đoạn; vẫn tiếp tục lượt chạy.'),'database'));}
+  const {data:schedule,error:scheduleError}=await db.from('affiliate_automation_settings').select('*').eq('owner_id',owner).maybeSingle();if(scheduleError)throw new Error('Không đọc được cấu hình lịch.');
+  if(!schedule?.enabled||schedule.schedule_mode!=='times'&&!scheduledDue(schedule))return {status:'skipped',message:'Lịch tắt hoặc chưa đến giờ đã chọn.'};
+  const {data:claimed,error:claimError}=await db.rpc('claim_affiliate_automation',{p_owner:owner});
+  if(claimError)throw new Error('Chưa lấy được lượt chạy. Kiểm tra các migration lịch đăng.');
+  if(!claimed)return {status:'skipped',message:'Chưa có mốc giờ chờ xử lý, lịch đã tắt hoặc một lượt khác đang chạy.'};
+  job=claimed;
   const {data:raw,error}=await db.from('affiliate_automation_settings').select('*').eq('owner_id',owner).single();if(error||!raw)throw new Error('Không đọc được cấu hình lịch.');
+  stage='configuration';
   const cfg=automationSettings(raw);if(!cfg.enabled)return finish('skipped','Lịch đã tắt.');
-  const {data:interrupted,error:interruptedError}=await db.from('affiliate_automation_jobs').select('id,post_id').eq('owner_id',owner).eq('status','running').neq('id',job);
+  stage='database';
+  const {data:interrupted,error:interruptedError}=await db.from('affiliate_automation_jobs').select('id,post_id,channel').eq('owner_id',owner).eq('status','running').neq('id',job);
   if(interruptedError)throw new Error('Không kiểm tra được lượt chạy trước.');
   if(interrupted?.length){
    const ids=interrupted.map(item=>item.post_id).filter(Boolean);
    const result=ids.length?await db.from('affiliate_content_posts').select('id,status').eq('owner_id',owner).in('id',ids):{data:[],error:null};
    if(result.error)throw new Error('Không đọc được trạng thái bài của lượt bị ngắt.');
-   let uncertain=false;
    for(const previous of interrupted){
     const post=result.data?.find(item=>item.id===previous.post_id),safe=!previous.post_id||post?.status==='draft'||post?.status==='published';
-    if(!safe)uncertain=true;
-    const {error:closeError}=await db.from('affiliate_automation_jobs').update({status:post?.status==='published'?'done':'failed',message:safe?'Lượt trước bị ngắt; lịch sử xác nhận chưa gửi hoặc đã lưu kết quả. Không gửi lại bài cũ.':'Lượt trước có bài đang gửi/chưa rõ kết quả. Kiểm tra Meta; không tự gửi lại.',finished_at:new Date().toISOString()}).eq('id',previous.id);
+    if(post?.status==='publishing'){
+     const {error:quarantineError}=await db.from('affiliate_content_posts').update({status:'unknown'}).eq('id',post.id).eq('owner_id',owner).eq('status','publishing');
+     if(quarantineError)throw new Error('Chưa đánh dấu được bài đang gửi để đối chiếu; bỏ qua lượt này, không gửi lại.');
+    }
+    const message=safe?'Lượt trước bị ngắt; không gửi lại bài cũ. Lịch tiếp tục ở các mốc sau.':'Lượt trước có bài chưa rõ kết quả. Giữ bài ở Cần xác minh, không gửi lại; lịch tiếp tục với bài mới.';
+    const {error:closeError}=await db.from('affiliate_automation_jobs').update({status:post?.status==='published'?'done':'skipped',message,finished_at:new Date().toISOString()}).eq('id',previous.id).eq('owner_id',owner);
     if(closeError)throw new Error('Không ghi nhận được lượt bị ngắt.');
+    if(!safe)await recordError(explainError(new Error('Lượt bị ngắt có bài chưa rõ kết quả. Đã cách ly bài cũ; chỉ xử lý bài mới ở lượt tiếp theo.'),'recovery'),previous.id,previous.channel||null);
    }
-   if(uncertain)throw new Error('Có bài của lượt trước đang gửi/chưa rõ kết quả. Kiểm tra Meta trước khi bật lại.');
   }
-  stage='ai';
+  stage='configuration';
   if(!configuredProviders()[cfg.provider as keyof ReturnType<typeof configuredProviders>])throw new Error('Chưa cấu hình khóa AI đã chọn.');
   stage='database';
   const {data:products,error:productsError}=await db.from('affiliate_products').select('id,name,description,affiliate_url,category').eq('owner_id',owner).eq('status','ready').not('verified_at','is',null).order('id').limit(1001);
   if(productsError)throw new Error('Không đọc được sản phẩm.');if((products?.length||0)>1000)throw new Error('Lịch hiện hỗ trợ tối đa 1.000 sản phẩm sẵn sàng.');
   const {data:eligible,error:eligibleError}=await db.rpc('eligible_affiliate_products',{p_owner:owner});if(eligibleError)throw new Error('Không đọc được giới hạn đăng của sản phẩm.');
-  const valid=(products||[]).filter(p=>eligible?.includes(p.id)&&productMatches(p,cfg)&&p.name?.trim()&&p.description?.trim()&&/^https:\/\//.test(p.affiliate_url));
+  const valid=(products||[]).filter(p=>eligible?.includes(p.id)&&productMatches(p,cfg)&&!readyIssues(p).length);
   const {data:images,error:imageError}=await db.from('affiliate_product_images').select('id,product_id').eq('owner_id',owner).limit(12001);if(imageError||((images?.length||0)>12000))throw new Error('Không đọc đủ danh sách ảnh.');
   let formats:('feed'|'reel')[]=['feed'];
   if(cfg.format_mode!=='feed'||Object.keys(cfg.slot_formats||{}).length){
@@ -89,10 +103,9 @@ export async function runAutomation(){
    if(!current?.enabled||current.updated_at!==raw.updated_at)throw new AIError('Lịch đã tắt hoặc cấu hình đã đổi. Dừng gọi AI.',{reason:'cancelled',retryable:true});
   },onFailure:async(error,attempt,willRetry,context)=>{
    const detail=explainError(error,'ai'),wait=willRetry?` · Thử lại sau khoảng ${Math.ceil(context.delayMs/1000)} giây.`:' · Dừng thử trong lượt này.';
-   const {error:logError}=await db.from('affiliate_automation_errors').insert({owner_id:owner,job_id:job,channel,...detail,message:`AI lần ${attempt}/5 · ${cfg.model||cfg.provider} · ${context.reason}: ${detail.message}${wait}`});
-   if(logError)throw new Error('Không lưu được nhật ký thử lại AI.');
-   const {error:progressError}=await db.from('affiliate_automation_jobs').update({message:`AI lần ${attempt}/5: ${detail.message}${wait}`}).eq('id',job);
-   if(progressError)throw new Error('Không lưu được tiến độ thử lại AI.');
+   await recordError({...detail,message:`AI lần ${attempt}/5 · ${cfg.model||cfg.provider} · ${context.reason}: ${detail.message}${wait}`});
+   try{const {error:progressError}=await db.from('affiliate_automation_jobs').update({message:`AI lần ${attempt}/5 · ${automationFailureContext(detail,channel)}${wait}`}).eq('id',job).eq('owner_id',owner).abortSignal(AbortSignal.timeout(5000));if(progressError)telemetry('automation.ai_retry_progress_unavailable',detail);}catch{telemetry('automation.ai_retry_progress_unavailable',detail);}
+
   }});
   stage='database';
   const post=result.posts?.[0];if(!post)throw new Error('Chưa có bài hợp lệ.');
@@ -105,10 +118,7 @@ export async function runAutomation(){
   return finish('done',`Đã tạo và đăng 1 ${selected.format==='reel'?'Reel':'bài thường'} · ${result.attempts??1} lần gọi AI.${published?.warning?' '+published.warning:''}`);
  }catch(error){
   if(stage==='ai'&&error instanceof AIError&&error.reason==='cancelled')return finish('skipped','Đã dừng gọi AI vì lịch tắt hoặc cấu hình đổi.');
-  const detail=explainError(error,stage);
-  const {error:logError}=await db.from('affiliate_automation_errors').insert({owner_id:owner,job_id:job,channel,...detail});
-  if(stage==='ai'&&isRecoverableAIError(error))return finish('skipped',`Lỗi AI tạm thời hoặc nội dung chưa đạt; chưa gửi Meta. Lịch vẫn bật, chờ khung giờ kế tiếp.${logError?' Không lưu được chi tiết lỗi.':''}`);
-  const {error:pauseError}=await db.from('affiliate_automation_settings').update({enabled:false,updated_at:new Date().toISOString()}).eq('owner_id',owner);
-  return finish('failed',`${pauseError?'Không xác nhận được tắt lịch.':'Lịch đã tạm dừng.'} ${logError?'Không lưu được chi tiết lỗi; kiểm tra kết nối cơ sở dữ liệu.':'Xem Nhật ký lỗi trong 8 giờ để biết nguyên nhân và cách xử lý.'}`);
+  const detail=explainError(error,stage),recorded=await recordError(detail);
+  return finish('skipped',automationFailureSummary(detail,channel,recorded));
  }
 }

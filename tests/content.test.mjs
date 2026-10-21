@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { composePost, validatePost, DISCLOSURE } from '../lib/content-rules.ts';
+import { composePost, validatePost, DISCLOSURE, PRODUCT_LINK_CTA } from '../lib/content-rules.ts';
 test('affiliate URL remains exact and Threads counts the entire final message',()=>{
  const link='https://s.shopee.vn/4LK8gjOA0T';
  const text=composePost('Một lựa chọn cho gia đình.',link,'threads');
- assert.ok(text.endsWith(link));assert.ok(text.includes(DISCLOSURE));
+ assert.ok(text.endsWith(link));assert.ok(text.includes(PRODUCT_LINK_CTA));assert.ok(!text.includes(DISCLOSURE));
  assert.doesNotThrow(()=>validatePost('threads',text));
  assert.throws(()=>composePost('test','javascript:alert(1)','threads'));
  assert.throws(()=>validatePost('threads',composePost('x'.repeat(490),link,'threads')));

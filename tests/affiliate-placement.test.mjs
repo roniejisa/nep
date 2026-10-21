@@ -2,26 +2,27 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
-import {composePost,affiliateComment,DISCLOSURE,FACEBOOK_CTA,INSTAGRAM_CTA,validatePost,isChannel} from '../lib/content-rules.ts';
+import {composePost,affiliateComment,DISCLOSURE,PRODUCT_LINK_CTA,FACEBOOK_CTA,INSTAGRAM_CTA,validatePost,isChannel} from '../lib/content-rules.ts';
 import {publishAffiliateComment} from '../lib/facebook-comment.ts';
 import {publishSocial} from '../lib/social-publish.ts';
 import {postImages} from '../lib/post-images.ts';
 import {postFormat,VIDEO_BUCKET,videoMetadata} from '../lib/reel-rules.ts';
 const link='https://s.shopee.vn/4LK8gjOA0T',target={id:'123',token:'private-test-token',version:'v26.0',appSecretProof:'proof'};
 
-test('new and legacy drafts have per-channel placement, exact CTA, no duplicate disclosure or leaked URLs',()=>{
+test('new and legacy drafts have per-channel placement, exact CTA, no old commission footers or leaked URLs',()=>{
  const old=`Áo giặt xong vẫn lo mùi?\nChọn theo chất liệu.\n\nLink affiliate: mình có thể nhận hoa hồng khi bạn mua qua link.\n${link}`;
  for(const channel of ['facebook','instagram','threads']){
   const body=composePost(old,link,channel);
   assert.equal(composePost(body,link,channel),body,'normalization is idempotent');
-  assert.equal(body.split(DISCLOSURE).length,2);
+  assert.ok(!body.includes(DISCLOSURE));assert.doesNotMatch(body,/nhận hoa hồng|Link affiliate/);
   if(channel==='threads')assert.ok(body.endsWith(link));
   else {assert.ok(!body.includes('https:'));assert.ok(body.endsWith(channel==='facebook'?FACEBOOK_CTA:INSTAGRAM_CTA));}
   validatePost(channel,body);
  }
  const ai='Một ý có căn cứ. https://other.example/path www.shop.com/path shop.vn/p [Mua](https://x.com) <a href="https://y.com">Xem</a>';
  for(const channel of ['facebook','instagram'])assert.doesNotMatch(composePost(ai,link,channel),/https?:|www\.|shop\.vn|other\.example/);
- assert.equal(affiliateComment(link),`${DISCLOSURE}\n${link}`);
+ assert.ok(composePost('Sữa rửa mặt hương hoa hồng.',link,'facebook').includes('hương hoa hồng'));
+ assert.equal(affiliateComment(link),`${PRODUCT_LINK_CTA}\n${link}`);
  assert.throws(()=>composePost('Copy',link,undefined));
 });
 

@@ -1,5 +1,5 @@
 import {cronAuthorized,runAutomation} from '@/lib/automation';
-import {failure} from '@/lib/content-server';
+import {explainError} from '@/lib/operation-error';
 export const runtime='nodejs';export const maxDuration=300;export const dynamic='force-dynamic';
-export async function POST(request:Request){if(!cronAuthorized(request.headers.get('authorization')))return Response.json({error:'Unauthorized'},{status:401});try{return Response.json(await runAutomation(),{headers:{'Cache-Control':'no-store'}});}catch(e){return failure(e);}}
+export async function POST(request:Request){if(!cronAuthorized(request.headers.get('authorization')))return Response.json({error:'Unauthorized'},{status:401});try{return Response.json(await runAutomation(),{headers:{'Cache-Control':'no-store'}});}catch(e){const detail=explainError(e,'configuration');console.error('automation.bootstrap_error',{kind:detail.kind,stage:detail.stage,http_status:detail.http_status,error_code:detail.error_code,service_role_configured:!!process.env.SUPABASE_SERVICE_ROLE_KEY,admin_configured:!!process.env.CONTENT_ADMIN_USER_ID});return Response.json({status:'skipped',message:'Không khởi tạo được lượt cron do cấu hình hoặc kết nối. Lịch không bị tự tắt; kiểm tra log Vercel và kết nối dữ liệu.'},{headers:{'Cache-Control':'no-store'}});}}
 export const GET=POST;

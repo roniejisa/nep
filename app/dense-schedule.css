@@ -1,0 +1,9 @@
+.dense-schedule-tools{display:grid;gap:var(--space-16);min-width:0}
+.dense-schedule-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-16);min-width:0}
+.dense-schedule-tools .form-field,.schedule-times-search{margin:0}
+.dense-schedule-tools textarea{max-width:100%;min-width:0}
+.dense-schedule-tools>.btn{justify-self:start}
+.simple-automation .schedule-time-list{min-width:0}
+.simple-automation .schedule-add>input{min-width:0;max-width:100%}
+.simple-automation .schedule-time{max-width:100%;flex-wrap:wrap}
+@media(max-width:639px){.dense-schedule-fields{grid-template-columns:minmax(0,1fr)}.dense-schedule-tools>.btn{justify-self:stretch}}

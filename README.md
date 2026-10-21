@@ -1,3 +1,17 @@
+> **2.14.0 — Lượt lỗi không tự tắt lịch.** Deploy source; không SQL mới. Nếu bản cũ đã tắt lịch, bật và lưu lại một lần. Lượt lỗi được ghi nhận rồi bỏ qua; bài chưa rõ kết quả được cách ly, không tự gửi lại. Xem `CONTINUE-ON-ERROR-2.14.md`.
+
+> **2.13.0 — Bỏ trần 24 mốc/ngày.** Chạy `supabase/automation-dense-schedule.sql` một lần rồi deploy source. Hỗ trợ mốc theo phút, tạo lịch theo khoảng, dán danh sách, phân trang và nhận lần lượt các mốc chờ. Xem `SCHEDULE-2.13.md`.
+
+> **2.12.1 — Không nháy đăng nhập khi chuyển tab.** Giữ workspace khi xác minh nền cùng tài khoản, phân biệt lỗi mạng với lỗi quyền, sửa icon chồng chữ và form mobile. Deploy source; không SQL/biến môi trường mới. Xem `AUTH-UI-2.12.1.md`.
+
+> **2.12.0 — Duyệt Sẵn sàng và quản lý hàng loạt.** Deploy source mới; không có SQL mới nếu đã cài 2.11.1. Vào Sản phẩm → Cho tất cả sẵn sàng, hoặc chọn nhóm để đổi trạng thái/danh mục. Xem `BULK-PRODUCTS-2.12.md`.
+
+> **2.11.1 — Nhập đủ mọi cột CSV, ảnh tùy chọn.** Chạy lại `supabase/product-import.sql` một lần rồi deploy. Mở `/san-pham/nhap/`; có thể nhập lại CSV cũ để bổ sung dữ liệu gốc, không tạo trùng hoặc ghi đè thông tin đã chỉnh. Xem `PRODUCT-IMPORT-2.11.md`.
+
+> **2.11.0 — Nhập CSV Shopee & ảnh hàng loạt.** Chạy `supabase/product-import.sql` sau automation-flex.sql, deploy source, rồi chạy `supabase/product-import-schedule.sql` nếu muốn lấy ảnh khi đóng tab. Trang `/san-pham/nhap/` có preview, chống trùng theo mã, hàng đợi ảnh WebP và ghép file ảnh theo mã. Xem `PRODUCT-IMPORT-2.11.md`.
+
+> **2.10.2:** CTA tự nhiên theo từng kênh; không tự thêm câu thông báo hoa hồng trong bài/bình luận. Xem `CTA-2.10.2.md`. Nâng từ 2.10.x không cần SQL hoặc cấu hình cron mới.
+
 > **2.10.1:** đồng nhất lề các khối quản trị, sửa chỗ thò ra/thụt vào trong Nội dung AI. Xem `UI-ALIGNMENT-2.10.1.md`. Nâng từ 2.10.0 không cần SQL mới.
 
 > **Cập nhật 2.10.0 — vị trí link theo nền tảng.** Chạy `supabase/affiliate-placement.sql` sau `reels.sql`, deploy rồi kết nối lại Facebook để cấp `pages_manage_engagement`. Facebook: link ở bình luận (ghim thủ công); Instagram: CTA dẫn lên Bio đã đặt link; Threads: link cuối bài. Bài đã đăng không bị đăng lại khi bình luận lỗi. Đọc `AFFILIATE-PLACEMENT-2.10.md` trước khi bật lại lịch.
